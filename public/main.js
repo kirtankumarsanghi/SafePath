@@ -52,6 +52,57 @@
   syncAccount();
   window.addEventListener("storage", syncAccount);
 
+  /* ---------------------------------------------------- theme synchronization */
+  function syncTheme() {
+    var theme = "dark";
+    try {
+      theme = localStorage.getItem("safepath-theme") === "light" ? "light" : "dark";
+    } catch (_) {}
+    document.documentElement.setAttribute("data-theme", theme);
+    if (theme === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    }
+    var toggle = document.getElementById("theme-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-label", theme === "light" ? "Switch to dark mode" : "Switch to light mode");
+      toggle.setAttribute("title", theme === "light" ? "Switch to dark mode" : "Switch to light mode");
+    }
+    var mobileIndicator = document.querySelector("#site-menu-theme .theme-indicator");
+    if (mobileIndicator) {
+      mobileIndicator.textContent = theme === "light" ? "Light" : "Dark";
+    }
+  }
+
+  function toggleTheme() {
+    var current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+    var next = current === "light" ? "dark" : "light";
+    try {
+      localStorage.setItem("safepath-theme", next);
+    } catch (_) {}
+    syncTheme();
+    window.dispatchEvent(new CustomEvent("safepath-theme-change", { detail: next }));
+  }
+
+  var themeToggleBtn = document.getElementById("theme-toggle");
+  if (themeToggleBtn) {
+    themeToggleBtn.addEventListener("click", toggleTheme);
+  }
+  var mobileThemeBtn = document.getElementById("site-menu-theme");
+  if (mobileThemeBtn) {
+    mobileThemeBtn.addEventListener("click", function() {
+      toggleTheme();
+      setMenu(false, false);
+    });
+  }
+
+  syncTheme();
+  window.addEventListener("storage", syncTheme);
+  window.addEventListener("safepath-theme-change", syncTheme);
+
   /* ------------------------------------------------------ background video */
   var video = document.querySelector(".bg-video");
   if (video) {
@@ -162,17 +213,20 @@
     if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) {
       canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
     }
+    var isLight = document.documentElement.getAttribute("data-theme") === "light";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#06070a"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = isLight ? "#f0f2f5" : "#06070a"; ctx.fillRect(0, 0, W, H);
     var s = Math.min(W / COLS, H / ROWS), ox = (W - s * COLS) / 2, oy = (H - s * ROWS) / 2;
 
-    ctx.strokeStyle = "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
+    ctx.strokeStyle = isLight ? "rgba(15, 23, 42, 0.08)" : "rgba(255,255,255,.05)"; ctx.lineWidth = 1;
     for (var gx = 0; gx <= COLS; gx++) { ctx.beginPath(); ctx.moveTo(ox + gx * s, oy); ctx.lineTo(ox + gx * s, oy + ROWS * s); ctx.stroke(); }
     for (var gy = 0; gy <= ROWS; gy++) { ctx.beginPath(); ctx.moveTo(ox, oy + gy * s); ctx.lineTo(ox + COLS * s, oy + gy * s); ctx.stroke(); }
 
     var wallAlpha = clamp(t / 430);
-    ctx.fillStyle = "rgba(58,64,73," + (0.35 + wallAlpha * 0.65) + ")";
+    ctx.fillStyle = isLight
+      ? "rgba(100, 116, 139, " + (0.45 + wallAlpha * 0.45) + ")"
+      : "rgba(58,64,73," + (0.35 + wallAlpha * 0.65) + ")";
     for (var k in walls) {
       var parts = k.split(","), wx = +parts[0], wy = +parts[1];
       rounded(ox + wx * s + 0.7, oy + wy * s + 0.7, s - 1.4, s - 1.4, 2);
@@ -215,8 +269,8 @@
     });
 
     var hx = ox + person.x * s + s / 2, hy = oy + person.y * s + s / 2;
-    ctx.beginPath(); ctx.arc(hx, hy, s * .38, 0, Math.PI * 2); ctx.fillStyle = "rgba(240,241,238,.16)"; ctx.fill();
-    ctx.beginPath(); ctx.arc(hx, hy, s * .25, 0, Math.PI * 2); ctx.fillStyle = "#f0f1ee"; ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, s * .38, 0, Math.PI * 2); ctx.fillStyle = isLight ? "rgba(15, 23, 42, 0.14)" : "rgba(240,241,238,.16)"; ctx.fill();
+    ctx.beginPath(); ctx.arc(hx, hy, s * .25, 0, Math.PI * 2); ctx.fillStyle = isLight ? "#0f172a" : "#f0f1ee"; ctx.fill();
 
     if (path.length > 1) {
       var travel = clamp((t - 2760) / 1000);
@@ -238,6 +292,7 @@
   }
   function fit() { draw(reduced.matches ? 9999 : lastT); }
   window.addEventListener("resize", fit);
+  window.addEventListener("safepath-theme-change", fit);
   if (reduced.matches) draw(9999);
   else requestAnimationFrame(frame);
   reduced.addEventListener("change", function () {

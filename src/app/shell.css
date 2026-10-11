@@ -128,6 +128,301 @@
 .sp-shell .plan-sim-stats strong { font-size: 22px; font-weight: 500; }
 .sp-shell select,.sp-shell input,.sp-shell textarea { color-scheme: dark; }
 .sp-shell .plan-form-row select,.sp-shell .plan-sim-header select { color: #e0e1df; }
+
+/* Light theme overrides for workspace and planner inside .sp-shell */
+.sp-shell.light,
+[data-theme="light"] .sp-shell {
+  background: #f8f9fa;
+  color: #111215;
+}
+.sp-shell.light h1, .sp-shell.light h2, .sp-shell.light h3,
+[data-theme="light"] .sp-shell h1, [data-theme="light"] .sp-shell h2, [data-theme="light"] .sp-shell h3 {
+  color: #111215;
+}
+.sp-shell.light .workspace-kicker,
+[data-theme="light"] .sp-shell .workspace-kicker {
+  color: #059669;
+}
+.sp-shell.light .workspace-head p,
+[data-theme="light"] .sp-shell .workspace-head p {
+  color: #5e626a;
+}
+.sp-shell.light .workspace-panel,
+.sp-shell.light .workspace-guide,
+.sp-shell.light .plan-tile,
+[data-theme="light"] .sp-shell .workspace-panel,
+[data-theme="light"] .sp-shell .workspace-guide,
+[data-theme="light"] .sp-shell .plan-tile {
+  background: #ffffff;
+  border-color: #e2e4e9;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03), 0 4px 14px rgba(0,0,0,0.02);
+}
+.sp-shell.light .metric-strip,
+[data-theme="light"] .sp-shell .metric-strip {
+  background: #ffffff;
+  border-color: #e2e4e9;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+.sp-shell.light .metric-strip > div + div,
+[data-theme="light"] .sp-shell .metric-strip > div + div {
+  border-left-color: #e2e4e9;
+}
+.sp-shell.light .metric-strip dt,
+[data-theme="light"] .sp-shell .metric-strip dt {
+  color: #5e626a;
+}
+.sp-shell.light .metric-strip dd,
+[data-theme="light"] .sp-shell .metric-strip dd {
+  color: #111215;
+}
+.sp-shell.light .metric-strip small,
+[data-theme="light"] .sp-shell .metric-strip small {
+  color: #71757e;
+}
+.sp-shell.light .plan-tile:hover,
+[data-theme="light"] .sp-shell .plan-tile:hover {
+  border-color: #cbd5e1;
+}
+.sp-shell.light .plan-tile__preview,
+[data-theme="light"] .sp-shell .plan-tile__preview {
+  background: #f1f3f6;
+  border-bottom-color: #e2e4e9;
+}
+.sp-shell.light .plan-tile__preview::after,
+[data-theme="light"] .sp-shell .plan-tile__preview::after {
+  background: #ffffff;
+  border-color: #d0d5dd;
+  color: #475467;
+}
+.sp-shell.light .plan-tile__body h3,
+[data-theme="light"] .sp-shell .plan-tile__body h3 {
+  color: #111215;
+}
+.sp-shell.light .plan-tile__body p,
+[data-theme="light"] .sp-shell .plan-tile__body p {
+  color: #5e626a;
+}
+.sp-shell.light .plan-tile__facts,
+[data-theme="light"] .sp-shell .plan-tile__facts {
+  color: #64748b;
+}
+.sp-shell.light .plan-tile__actions,
+[data-theme="light"] .sp-shell .plan-tile__actions {
+  border-top-color: #e2e4e9;
+}
+.sp-shell.light .plan-tile__delete,
+[data-theme="light"] .sp-shell .plan-tile__delete {
+  color: #64748b;
+}
+.sp-shell.light .plan-tile__delete:hover,
+[data-theme="light"] .sp-shell .plan-tile__delete:hover {
+  color: #dc2626;
+}
+.sp-shell.light .plan-library-toolbar input,
+[data-theme="light"] .sp-shell .plan-library-toolbar input {
+  background: #ffffff;
+  border-color: #d0d5dd;
+  color: #111215;
+}
+.sp-shell.light .workspace-table-wrap,
+[data-theme="light"] .sp-shell .workspace-table-wrap {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .workspace-table th,
+[data-theme="light"] .sp-shell .workspace-table th {
+  background: #f8fafc;
+  color: #475467;
+  border-bottom: 1px solid #e2e4e9;
+}
+.sp-shell.light .workspace-table td,
+[data-theme="light"] .sp-shell .workspace-table td {
+  border-top-color: #e2e4e9;
+  color: #334155;
+}
+.sp-shell.light .workspace-table tr:hover td,
+[data-theme="light"] .sp-shell .workspace-table tr:hover td {
+  background: #f8fafc;
+}
+.sp-shell.light .workspace-table .name,
+[data-theme="light"] .sp-shell .workspace-table .name {
+  color: #0f172a;
+}
+.sp-shell.light .workspace-empty,
+[data-theme="light"] .sp-shell .workspace-empty {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+.sp-shell.light .workspace-empty p,
+[data-theme="light"] .sp-shell .workspace-empty p {
+  color: #64748b;
+}
+.sp-shell.light .workspace-alert,
+[data-theme="light"] .sp-shell .workspace-alert {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+.sp-shell.light .workspace-alert.success,
+[data-theme="light"] .sp-shell .workspace-alert.success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+.sp-shell.light .workspace-guide strong,
+[data-theme="light"] .sp-shell .workspace-guide strong {
+  color: #111215;
+}
+.sp-shell.light .workspace-guide p,
+[data-theme="light"] .sp-shell .workspace-guide p {
+  color: #5e626a;
+}
+.sp-shell.light .workspace-guide > a,
+[data-theme="light"] .sp-shell .workspace-guide > a {
+  border-top-color: #e2e4e9;
+}
+.sp-shell.light select,
+.sp-shell.light input:not([type=checkbox]):not([type=range]),
+.sp-shell.light textarea,
+[data-theme="light"] .sp-shell select,
+[data-theme="light"] .sp-shell input:not([type=checkbox]):not([type=range]),
+[data-theme="light"] .sp-shell textarea {
+  color-scheme: light;
+  background: #ffffff;
+  border-color: #d0d5dd;
+  color: #111215;
+}
+.sp-shell.light .plan-btn.primary,
+[data-theme="light"] .sp-shell .plan-btn.primary {
+  background: #111215;
+  border-color: #111215;
+  color: #ffffff;
+}
+.sp-shell.light .plan-btn.primary:hover:not(:disabled),
+[data-theme="light"] .sp-shell .plan-btn.primary:hover:not(:disabled) {
+  background: #25282e;
+  border-color: #25282e;
+}
+.sp-shell.light .plan-btn.secondary,
+[data-theme="light"] .sp-shell .plan-btn.secondary {
+  background: #ffffff;
+  border-color: #d0d5dd;
+  color: #111215;
+}
+.sp-shell.light .plan-btn.secondary:hover:not(:disabled),
+[data-theme="light"] .sp-shell .plan-btn.secondary:hover:not(:disabled) {
+  background: #f1f3f5;
+  border-color: #bcc3cd;
+}
+.sp-shell.light .plan-stepper,
+[data-theme="light"] .sp-shell .plan-stepper {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .plan-stepper > button.active,
+[data-theme="light"] .sp-shell .plan-stepper > button.active {
+  background: #f0fdf4;
+}
+.sp-shell.light .active .step-number,
+[data-theme="light"] .sp-shell .active .step-number {
+  background: #111215;
+  border-color: #111215;
+  color: #ffffff;
+}
+.sp-shell.light .plan-stat-strip,
+[data-theme="light"] .sp-shell .plan-stat-strip {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .plan-stat-strip strong,
+[data-theme="light"] .sp-shell .plan-stat-strip strong {
+  color: #111215;
+}
+.sp-shell.light .plan-dropzone,
+[data-theme="light"] .sp-shell .plan-dropzone {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+}
+.sp-shell.light .plan-dropzone:hover,
+.sp-shell.light .plan-dropzone.dragging,
+[data-theme="light"] .sp-shell .plan-dropzone:hover,
+[data-theme="light"] .sp-shell .plan-dropzone.dragging {
+  border-color: #059669;
+  background-color: #f0fdf4;
+}
+.sp-shell.light .upload-glyph,
+[data-theme="light"] .sp-shell .upload-glyph {
+  color: #059669;
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .editor-canvas-wrap,
+[data-theme="light"] .sp-shell .editor-canvas-wrap {
+  background-color: #f1f5f9;
+  background-image: radial-gradient(#94a3b833 1px, transparent 1px);
+}
+.sp-shell.light .editor-tools button.selected,
+[data-theme="light"] .sp-shell .editor-tools button.selected {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+.sp-shell.light .plan-segmented button.active,
+[data-theme="light"] .sp-shell .plan-segmented button.active {
+  color: #111215;
+  background: #ffffff;
+}
+.sp-shell.light .plan-sim-controls .play,
+[data-theme="light"] .sp-shell .plan-sim-controls .play {
+  background: #111215;
+  color: #ffffff;
+  border-color: #111215;
+}
+.sp-shell.light .plan-card,
+[data-theme="light"] .sp-shell .plan-card {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .plan-card h2,
+.sp-shell.light .plan-card h3,
+[data-theme="light"] .sp-shell .plan-card h2,
+[data-theme="light"] .sp-shell .plan-card h3 {
+  color: #111215;
+}
+.sp-shell.light .plan-file-strip,
+[data-theme="light"] .sp-shell .plan-file-strip {
+  background: #ffffff;
+  border-color: #e2e4e9;
+}
+.sp-shell.light .candidate-row,
+[data-theme="light"] .sp-shell .candidate-row {
+  border-color: #e2e4e9;
+}
+.sp-shell.light .candidate-row.focused,
+[data-theme="light"] .sp-shell .candidate-row.focused {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.sp-shell.light .candidate-actions button,
+[data-theme="light"] .sp-shell .candidate-actions button {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+.sp-shell.light .candidate-actions button.accept,
+[data-theme="light"] .sp-shell .candidate-actions button.accept {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+.sp-shell.light .plan-form-row select,
+.sp-shell.light .plan-sim-header select,
+[data-theme="light"] .sp-shell .plan-form-row select,
+[data-theme="light"] .sp-shell .plan-sim-header select {
+  color: #111215;
+  background: #ffffff;
+  border-color: #d0d5dd;
+}
 @media(max-width:1040px) { .workspace-head { align-items: flex-start; flex-direction: column; } .auth-layout { grid-template-columns: 1fr 380px; gap: 36px; } .plan-library { grid-template-columns: repeat(2,minmax(0,1fr)); } .metric-strip { grid-template-columns: repeat(2,1fr); gap: 20px 0; } .metric-strip > div:nth-child(n+3) { border-top: 1px solid #282a2f; padding-top: 18px; } .metric-strip > div:nth-child(2n+1) { border-left: 0; } }
 @media(max-width:800px) { .workspace-columns,.profile-columns { grid-template-columns: 1fr; } .auth-layout { grid-template-columns: 1fr; max-width: 480px; margin: 4px auto; } .auth-intro p { max-width: none; } .auth-intro .site-link { margin-top: 8px; } }
 @media(max-width:600px) { .sp-main__inner { padding: 30px 0 44px; } .workspace-head h1 { font-size: 30px; } .plan-library { grid-template-columns: 1fr; } .metric-strip > div { padding: 0 13px; } .metric-strip dd { font-size: 25px; } .metric-strip small { font-size: 9px; } .metric-strip dt { font-size: 10px; } .plan-tile__preview { height: 180px; } .workspace-panel { padding: 20px; } .workspace-head { gap: 18px; } .plan-library-toolbar { flex-wrap: wrap; gap: 10px; } .plan-library-toolbar input { width: 100%; } }

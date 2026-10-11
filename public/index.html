@@ -10,6 +10,17 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/site.css" />
   <link rel="stylesheet" href="/styles.css" />
+  <script>
+    (function(){
+      try {
+        var t = localStorage.getItem('safepath-theme');
+        if (t === 'light') {
+          document.documentElement.setAttribute('data-theme', 'light');
+          document.documentElement.classList.add('light');
+        }
+      } catch (_) {}
+    })();
+  </script>
 </head>
 <body>
 <div class="landing-page">
@@ -19,10 +30,15 @@
       <a href="/" aria-current="page">Home</a><a href="/dashboard">Dashboard</a><a href="/maps">Floor plans</a><a href="/simulator">Simulator</a><a href="/theory">Theory</a><a href="/runs">History</a>
     </nav>
     <a class="site-account" href="/auth">Sign in</a>
+    <button id="theme-toggle" class="site-theme-toggle" type="button" aria-label="Switch to light mode" title="Switch to light mode">
+      <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+    </button>
     <button id="site-menu-button" class="site-menu-button" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
   </div></header>
   <div id="site-menu" class="site-menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden><div class="site-menu__panel">
     <nav aria-label="Mobile navigation"><a href="/" aria-current="page">Home</a><a href="/dashboard">Dashboard</a><a href="/maps">Floor plans</a><a href="/simulator">Simulator</a><a href="/theory">Theory</a><a href="/runs">History</a></nav>
+    <button type="button" class="site-menu__theme" id="site-menu-theme"><span>Appearance</span><span class="theme-indicator">Dark</span></button>
     <a class="site-menu__account" href="/auth">Sign in</a><a class="site-menu__action" href="/maps/new">Upload a floor plan</a>
   </div></div>
 
