@@ -82,6 +82,10 @@ function isPortOpen(port = 5432, host = '127.0.0.1') {
 }
 
 async function ensureDbServer() {
+  if (process.env.VERCEL || process.env.CI) return null;
+  const isLocal = !process.env.DATABASE_URL || process.env.DATABASE_URL.includes('127.0.0.1') || process.env.DATABASE_URL.includes('localhost');
+  if (!isLocal) return null;
+
   const open = await isPortOpen(5432, '127.0.0.1');
   if (open) return null;
 
@@ -135,7 +139,7 @@ async function main() {
     return;
   }
 
-  if (['dev', 'build', 'start', 'seed', 'test:e2e'].includes(action)) {
+  if (['dev', 'start', 'seed', 'test:e2e'].includes(action)) {
     dbProcess = await ensureDbServer();
   }
 
