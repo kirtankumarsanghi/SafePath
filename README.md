@@ -1,79 +1,225 @@
-# SafePath — floor-plan evacuation planning
+<div align="center">
 
-A Next.js + PostgreSQL planning workspace with a static HTML/CSS/vanilla-JS homepage. This is a learning and planning model, not emergency navigation or a certified building-safety system.
+<img src="public/assets/logo.webp" alt="SafePath logo" width="96" />
 
-## One coherent interface
+# SafePath
 
-The homepage and every application page use the same header, logo, menu links, account action, spacing, typography and responsive breakpoint. `/public/site.css` is the single source of navigation and footer styling. The navigation definition lives in `public/navigation.json`; React uses it directly, and browser tests verify that the static homepage markup matches it.
+**Floor-plan evacuation modeling and A\* pathfinding simulation.**
 
-- Home: an expert-grade cinematic blueprint backdrop, detailed technical specifications (Heuristic Admissibility, Strict Pixel Overlap, Exclusion Boundaries), upload and practice-simulator actions, and a three-step workflow. The hero features a live CAD-style Dynamic Graph Solver canvas that simulates A* frontier expansion and path extraction, paired with a monospaced live terminal log console (Engine Console Log) that outputs real-time operations, vertices, and steps. Under `prefers-reduced-motion`, the console logs settle instantly and the canvas renders the resolved optimal path.
-- Dashboard: a high-density expert Command Center. It provides extensive workspace telemetry metrics (Active Blueprints, Exit Nodes, Total Start Vertices, Saved Solver Passes), a live system status log panel showing server workers and database health, a searchable CAD-style floor-plan list with actual saved thumbnails, recent search scenario logs, and a structured layout-refinement guide.
-- Floor plans: searchable saved models, review and simulator links, confirmation before deletion, and rollback on failed optimistic deletion.
-- Upload / editor / simulator / theory: existing full-stack functionality, with matching neutral controls and readable typography. Semantic colors in the grid and status messages remain meaningful.
-- History: actual stored runs and links to the current version of the associated map. Opening a map is not presented as replaying an old scenario.
-- Account: email/password signup and sign-in, persisted display-name editing, and working sign-out. Guests see a useful sign-in state rather than hardcoded profile information.
+Turn an architectural blueprint into a reviewable graph, then compute, visualize and benchmark optimal egress routes.
 
-There are no emoji characters, decorative trust logos or percentage/uptime claims in the UI. Headings use Inter for clarity. Technical grid glyphs, state colors and functional SVG tool controls are retained.
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
+![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PGlite-336791?logo=postgresql&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-11%20unit%20%7C%2019%20E2E-brightgreen)
 
-## Homepage files
+</div>
+
+> **Safety notice:** SafePath is a learning and planning model. It is **not** emergency navigation software and **not** a certified building-safety system. In a real emergency, follow posted signage, certified fire-safety systems and instructions from local emergency personnel.
+
+---
+
+## Table of contents
+
+- [Overview](#overview)
+- [How it works](#how-it-works)
+- [Features](#features)
+- [Routes](#routes)
+- [Tech stack](#tech-stack)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Project structure](#project-structure)
+- [Testing](#testing)
+- [Model assumptions and limitations](#model-assumptions-and-limitations)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Overview
+
+SafePath bridges **architectural blueprint analysis** (OCR and computer vision) with the **A\* graph search algorithm**. Upload a 2D floor plan, let the engine convert it into a grid, correct it in a CAD-style editor, and then solve multi-occupant, multi-exit shortest paths you can step through node by node.
+
+It is built for safety planners, students and anyone who wants to see *why* a pathfinding algorithm makes the decisions it does.
+
+## How it works
 
 ```
-public/index.html          static homepage
-public/styles.css          homepage composition only
-public/site.css            shared navigation, footer and base button styles
-public/main.js             accessible menu, account state, and the A* hero illustration
-public/navigation.json     navigation definition
-public/assets/logo.webp    logo mark
+ Blueprint image  ──►  OCR & line detection  ──►  Human-in-the-loop     ──►  A* graph solver
+ (PNG/JPEG/WebP…)      (Tesseract + Sharp)        grid editor                (multi-exit shortest path)
+                                                  (walls, doors, exits,
+                                                   occupants)
 ```
 
-A Next.js rewrite serves `public/index.html` at `/`. This lets the homepage remain plain HTML without replacing the server-backed application pages.
+1. **Upload** a raster floor plan (PNG, JPEG, WebP, GIF, TIFF or AVIF; up to 12 MB and 40 MP).
+2. **Scan.** The server normalizes the image and uses offline English OCR, line evidence and color components to produce a reviewable grid.
+3. **Refine.** Compare the source image with the grid, adjust conversion thresholds, confirm real doorways and exits, and place occupants.
+4. **Validate and save.** Routes are validated, and the server-computed result and map are saved atomically.
+5. **Simulate.** Open the map in the simulator, step through A\*, compare heuristics, add hazards and recalculate.
 
-## Application files
+## Features
 
-- `src/components/SiteHeader.tsx` and `SiteFooter.tsx`: the application versions of the shared site header/footer.
-- `src/components/DashboardLayout.tsx`: one site shell for all application pages, including sign-in.
-- `src/app/shell.css`: workspace styling, not separate navigation styling.
-- `src/app/api/maps/[id]/preview/route.ts`: SVG thumbnails drawn from each map's actual stored grid.
-- `src/app/api/auth/me/route.ts`: authenticated profile loading and display-name updates.
+### Blueprint ingestion and computer vision
+- Image processing with **Sharp**: line detection, thresholding and noise reduction.
+- Fully **offline OCR** using Tesseract.js with a bundled model (`assets/ocr/eng.traineddata.gz`).
+- Exit candidates are flagged by reading signage, distinguishing real exit signs from "NO EXIT" and fire-equipment markings.
+- Conversion preserves rooms and thin dividing walls instead of discarding them.
 
-Existing upload, conversion, A*, server validation, persistence and image-retention code is preserved.
+### Human-in-the-loop CAD grid editor
+- Confirm exit doors, place occupant start positions and paint walkable corridors.
+- Adjust darkness and aspect thresholds, with undo/correction support.
+- Colored safety symbols are treated as **review candidates**, never as automatically verified exits or active fires.
 
-## Planning workflow
+### A\* solver and simulator
+- Multi-occupant, multi-exit shortest paths.
+- Heuristics: **Manhattan**, **Euclidean** and **Chebyshev**, verified against a ground-truth **Dijkstra** baseline.
+- Strict movement physics: diagonal corner-cutting through walls is prohibited.
+- **Dynamic hazards:** place fire or smoke in real time. The solver reroutes, or honestly reports that no route exists.
+- **Step-by-step trace:** scrub through open-set and closed-set expansions to inspect each decision.
 
-1. Upload a supported raster image (PNG, JPEG, WebP, GIF, TIFF or AVIF; up to 12 MB and 40 MP).
-2. The server normalizes the image and uses local English OCR, line evidence and color components to produce a reviewable grid.
-3. Compare source and grid, adjust conversion settings, verify actual doorways and exits, and place people.
-4. Correct uncertain geometry. Colored safety symbols do not automatically become active fires or verified exits.
-5. Validate routes and save the reviewed model. A server-computed result and map are saved atomically.
-6. Open that map in the simulator. Step through A*, compare heuristics, introduce explicit scenario hazards and recalculate.
+### Workspace
+- Dashboard with workspace telemetry, SVG thumbnails drawn from each map's real stored grid, and a live system status panel.
+- Searchable plan library with delete confirmation and rollback on failed optimistic deletes.
+- Run history of explored nodes, path lengths, runtimes and outcomes.
+- JWT-based email/password accounts with persistent profile editing.
 
-Unknown cells, walls, windows and blocked passages are impassable. Red/green symbols are review candidates rather than inferred active hazards or usable exit doors. Grid distances are model units, not physical evacuation times. People are routed independently; congestion and exit capacities are not modeled.
+### One coherent interface
+- The static homepage and every app page share the same header, footer, spacing and breakpoints.
+- `public/site.css` is the single source of navigation and footer styling, and `public/navigation.json` is the single navigation definition.
+- Honors `prefers-reduced-motion`: the hero canvas renders the resolved path and console logs settle instantly.
 
-## Data and authentication
+## Routes
 
-Configure `DATABASE_URL` for PostgreSQL. Configure a strong `JWT_SECRET` for deployments; do not rely on a development fallback. Drizzle is used for database interactions. No new table or schema change was needed for this UI refinement.
+| Route | View | Description |
+| --- | --- | --- |
+| `/` | Landing page | Static blueprint showcase with an interactive A\* expansion canvas and live engine console log. |
+| `/dashboard` | Command center | Active blueprints, exit nodes, start vertices, saved solver passes and thumbnails. |
+| `/maps/new` | Upload and scan | Multi-step pipeline: upload, OCR labels, grid conversion, route validation. |
+| `/maps` | Plan library | Searchable catalog of saved plans with previews, edit links and deletion safeguards. |
+| `/simulator` | A\* simulator | Full-screen grid simulator with play/pause, hazard placement and step timeline. |
+| `/theory` | Algorithm theory | Heuristic admissibility, tie-breaking rules and Dijkstra comparison benchmarks. |
+| `/runs` | Run history | Audit log of explored nodes, path step counts, run times and outcomes. |
+| `/auth`, `/profile` | Authentication | Sign up, sign in and profile management. |
 
-Map/run list endpoints expose the existing shared workspace, including sample plans. This UI update does not claim per-user isolation of those shared collections. Dashboard counts reflect the loaded collections; recent runs are capped at 50.
+## Tech stack
 
-The sample image is `public/samples/campus-plan.png`. `assets/ocr` contains the local OCR language model. The legacy seed script clears maps/runs; do not run it against personal data merely to refresh the interface.
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js 16 (App Router, Turbopack), React 19, vanilla CSS design system |
+| Database | PostgreSQL wire protocol via embedded `@electric-sql/pglite` and `pg-gateway` (port 5432), persisted to `.pgdata/` |
+| ORM | Drizzle ORM (`users`, `floor_maps`, `runs`) |
+| Image processing | Sharp |
+| OCR | Tesseract.js with offline English model |
+| Auth | JWT |
+| Testing | `node:test` via `tsx`, Playwright |
 
-## Verification
+## Getting started
 
-Unit tests:
+### Prerequisites
 
-`npx tsx --test tests/astar.test.ts tests/map-analysis.test.ts`
+- Node.js 20 or newer (the version required by Next.js 16)
+- npm
 
-Browser tests with the app running:
+### Install and run
 
-`npx playwright test tests/landing.spec.ts tests/design-system.spec.ts tests/account.spec.ts tests/upload.spec.ts tests/refinement.spec.ts tests/monochrome.spec.ts tests/image-retention.spec.ts --workers=1`
+```bash
+git clone https://github.com/kirtankumarsanghi/SafePath.git
+cd SafePath
 
-These tests verify pixel-level header geometry/style parity between the static homepage and app, matching mobile breakpoints, keyboard focus handling, correct route links, real counts and previews, signup/profile persistence/sign-out, PNG and monochrome uploads, correction/undo, route validation, dynamic hazards and preservation of uploaded images on editing.
+npm install
+cp .env.example .env     # then edit the values, see Configuration below
 
-Production checks:
+npm run dev
+```
 
-- `npx next typegen`
-- `npm exec tsc -- --noEmit --pretty false`
-- `npm run build`
-- Platform-managed `build_and_start`, including `/api/health`.
+Then open <http://localhost:3000>.
 
-For real emergencies, use posted signs and approved building/emergency instructions. Successful A* routing proves only reachability and optimality for the supplied grid, not that the real-world route is safe.
+To try it quickly, upload the bundled sample plan at `public/samples/campus-plan.png` on the `/maps/new` page.
+
+### Production build
+
+```bash
+npx next typegen
+npm exec tsc -- --noEmit --pretty false
+npm run build
+npm start
+```
+
+A health check is available at `/api/health`.
+
+## Configuration
+
+Copy `.env.example` to `.env` and set:
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `JWT_SECRET` | Secret used to sign session tokens. **Use a strong, unique value in any deployment.** Do not rely on a development fallback. |
+
+> The legacy seed script **clears maps and runs**. Do not run it against data you want to keep.
+
+## Project structure
+
+```
+SafePath/
+├── assets/ocr/            Offline Tesseract language model
+├── public/
+│   ├── index.html         Static homepage
+│   ├── styles.css         Homepage composition
+│   ├── site.css           Shared navigation, footer and base button styles
+│   ├── main.js            Menu, account state and the A* hero illustration
+│   ├── navigation.json    Navigation definition
+│   ├── assets/logo.webp   Logo mark
+│   └── samples/           Sample floor plan
+├── scripts/               Utility and seed scripts
+├── src/
+│   ├── app/               Next.js App Router pages, API routes and shell.css
+│   └── components/        SiteHeader, SiteFooter, DashboardLayout, ...
+├── tests/                 Unit and Playwright E2E tests
+├── drizzle.config.json    Drizzle ORM configuration
+└── next.config.ts         Rewrites `/` to the static homepage
+```
+
+A Next.js rewrite serves `public/index.html` at `/`, so the homepage stays plain HTML without replacing the server-backed application pages.
+
+Notable API routes:
+
+- `src/app/api/maps/[id]/preview/route.ts` returns SVG thumbnails drawn from each map's stored grid.
+- `src/app/api/auth/me/route.ts` handles authenticated profile loading and display-name updates.
+
+## Testing
+
+**Unit tests (11):** admissibility, boundary conditions, dynamic hazards and OCR precision.
+
+```bash
+npx tsx --test tests/astar.test.ts tests/map-analysis.test.ts
+```
+
+**End-to-end tests (19):** run with the app already running.
+
+```bash
+npx playwright test \
+  tests/landing.spec.ts tests/design-system.spec.ts tests/account.spec.ts \
+  tests/upload.spec.ts tests/refinement.spec.ts tests/monochrome.spec.ts \
+  tests/image-retention.spec.ts --workers=1
+```
+
+The E2E suite covers pixel-level header parity between the static homepage and the app, matching mobile breakpoints, keyboard focus handling, route links, real counts and previews, signup/profile persistence/sign-out, PNG and monochrome uploads, correction and undo, route validation, dynamic hazards and preservation of uploaded images when editing.
+
+## Model assumptions and limitations
+
+- Unknown cells, walls, windows and blocked passages are **impassable**.
+- Red and green symbols are **review candidates**, not inferred hazards or verified exits.
+- Grid distances are **model units**, not physical evacuation times.
+- Occupants are routed **independently**. Congestion and exit capacity are not modeled.
+- A successful A\* result proves only **reachability and optimality on the supplied grid**, not that the real-world route is safe.
+- Map and run list endpoints expose a **shared workspace** (including sample plans). Per-user isolation of these collections is not implemented.
+
+## Contributing
+
+Issues and pull requests are welcome. Before opening a PR, please run the unit tests, type-check and a production build as described above.
+
+## License
+
+No license has been specified yet. Add a `LICENSE` file (for example MIT) and update this section.
