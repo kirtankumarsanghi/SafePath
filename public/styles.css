@@ -574,77 +574,129 @@ img { display: block; max-width: 100%; }
   background: #f1f3f6;
 }
 [data-theme="light"] .bg-video {
-  opacity: 0.12;
-  filter: contrast(0.85) brightness(1.2);
+  opacity: 0.08;
+  filter: contrast(0.9) brightness(1.1);
 }
-[data-theme="light"] .landing-main::before {
-  background: radial-gradient(110% 80% at 75% 35%, rgba(248, 249, 251, 0.2), rgba(248, 249, 251, 0.85) 68%, #f8f9fb 100%);
+[data-theme="light"] .landing-media {
+  background: #f8f9fb;
+}
+[data-theme="light"] .landing-media::after {
+  background: radial-gradient(110% 80% at 75% 35%, rgba(248, 249, 251, 0.45), rgba(248, 249, 251, 0.95) 68%, #f8f9fb 100%);
 }
 [data-theme="light"] .landing-kicker {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: #d0d5dd;
-  color: #059669;
+  background: rgba(255, 255, 255, 0.95);
+  border-color: #cbd5e1;
+  color: #047857;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 [data-theme="light"] .landing-hero h1 {
   color: #0f172a;
 }
+[data-theme="light"] .landing-hero h1 span {
+  color: #64748b;
+}
 [data-theme="light"] .landing-lede {
   color: #475467;
 }
-[data-theme="light"] .plan-frame {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: #e2e8f0;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-}
-[data-theme="light"] .plan-frame__canvas {
-  background: #f8f9fa;
-  border-bottom-color: #e2e8f0;
-}
-[data-theme="light"] .plan-frame__header {
-  border-bottom-color: #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
-}
-[data-theme="light"] .plan-frame__footer {
-  border-top-color: #e2e8f0;
-  background: #ffffff;
+[data-theme="light"] .landing-text-link {
   color: #475467;
 }
-[data-theme="light"] .terminal-log {
-  background: rgba(255, 255, 255, 0.95);
+[data-theme="light"] .landing-text-link:hover {
+  color: #0f172a;
+}
+[data-theme="light"] .specs-grid {
+  border-top-color: #e2e8f0;
+}
+[data-theme="light"] .spec-unit {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+[data-theme="light"] .spec-unit__icon {
+  color: #0f172a;
+}
+[data-theme="light"] .spec-unit strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+[data-theme="light"] .spec-unit p {
+  color: #64748b;
+}
+[data-theme="light"] .plan-frame__bar {
+  background: #ffffff;
   border-color: #e2e8f0;
+  color: #0f172a;
+}
+[data-theme="light"] .plan-frame__title {
+  color: #0f172a;
+  font-weight: 600;
+}
+[data-theme="light"] .plan-frame__meta {
+  color: #64748b;
+}
+[data-theme="light"] .plan-frame__canvas {
+  background: #f1f3f6;
+  border-color: #e2e8f0;
+}
+[data-theme="light"] .plan-legend {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475467;
+}
+[data-theme="light"] .swatch--person {
+  background: #0f172a;
+}
+[data-theme="light"] .swatch--explored {
+  background: rgba(90, 179, 125, 0.2);
+  border-color: rgba(90, 179, 125, 0.5);
+}
+[data-theme="light"] .terminal-log {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 [data-theme="light"] .terminal-log__header {
   border-bottom-color: #e2e8f0;
-  background: #ffffff;
-  color: #0f172a;
+  background: #f8fafc;
+  color: #475467;
 }
 [data-theme="light"] .terminal-log__body {
-  background: #f8fafc;
+  background: #fcfdfe;
+  color: #334155;
 }
-[data-theme="light"] .spec-unit {
-  background: #ffffff;
-  border-color: #e2e8f0;
-  color: #0f172a;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+[data-theme="light"] .terminal-row.sys {
+  color: #64748b;
 }
-[data-theme="light"] .spec-unit h2 {
-  color: #0f172a;
+[data-theme="light"] .terminal-row.run {
+  color: #0f766e;
+  font-weight: 500;
 }
-[data-theme="light"] .spec-unit p {
-  color: #475467;
+[data-theme="light"] .terminal-row.route {
+  color: #047857;
+  font-weight: 600;
 }
 [data-theme="light"] .landing-workflow {
   border-top-color: #e2e8f0;
+  background: rgba(248, 249, 251, 0.9);
+}
+[data-theme="light"] .landing-workflow a {
+  color: #1e293b;
 }
 [data-theme="light"] .landing-workflow a + a {
   border-left-color: #e2e8f0;
+}
+[data-theme="light"] .landing-workflow .workflow-number {
+  color: #94a3b8;
 }
 [data-theme="light"] .landing-workflow strong {
   color: #0f172a;
 }
 [data-theme="light"] .landing-workflow p {
-  color: #475467;
+  color: #64748b;
+}
+[data-theme="light"] .landing-workflow a:hover strong {
+  color: #047857;
 }
 [data-theme="light"] .action-btn.primary {
   background: #0f172a;
@@ -664,4 +716,5 @@ img { display: block; max-width: 100%; }
   background: #f8fafc;
   border-color: #94a3b8;
 }
+
 

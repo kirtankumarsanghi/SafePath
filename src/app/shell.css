@@ -356,47 +356,256 @@
   background: #ffffff;
   border-color: #e2e4e9;
 }
-.sp-shell.light .editor-canvas-wrap,
-[data-theme="light"] .sp-shell .editor-canvas-wrap {
-  background-color: #f1f5f9;
-  background-image: radial-gradient(#94a3b833 1px, transparent 1px);
-}
-.sp-shell.light .editor-tools button.selected,
-[data-theme="light"] .sp-shell .editor-tools button.selected {
-  background: #ecfdf5;
-  border-color: #a7f3d0;
-  color: #059669;
-}
-.sp-shell.light .plan-segmented button.active,
-[data-theme="light"] .sp-shell .plan-segmented button.active {
-  color: #111215;
-  background: #ffffff;
-}
-.sp-shell.light .plan-sim-controls .play,
-[data-theme="light"] .sp-shell .plan-sim-controls .play {
-  background: #111215;
-  color: #ffffff;
-  border-color: #111215;
+.sp-shell.light .planner,
+[data-theme="light"] .sp-shell .planner {
+  --p-bg: #ffffff;
+  --p-soft: #f8fafc;
+  --p-ink: #0f172a;
+  --p-muted: #5e6676;
+  --p-line: #e2e8f0;
+  --p-orange: #059669;
+  --p-tint: #f0fdf4;
 }
 .sp-shell.light .plan-card,
 [data-theme="light"] .sp-shell .plan-card {
   background: #ffffff;
-  border-color: #e2e4e9;
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 .sp-shell.light .plan-card h2,
 .sp-shell.light .plan-card h3,
 [data-theme="light"] .sp-shell .plan-card h2,
 [data-theme="light"] .sp-shell .plan-card h3 {
-  color: #111215;
+  color: #0f172a;
+  font-weight: 600;
+}
+.sp-shell.light .plan-page-heading h1,
+[data-theme="light"] .sp-shell .plan-page-heading h1 {
+  color: #0f172a;
+}
+.sp-shell.light .plan-page-heading p,
+[data-theme="light"] .sp-shell .plan-page-heading p {
+  color: #475467;
+}
+.sp-shell.light .plan-eyebrow,
+[data-theme="light"] .sp-shell .plan-eyebrow {
+  color: #059669;
+  font-weight: 700;
+}
+.sp-shell.light .plan-breadcrumb,
+[data-theme="light"] .sp-shell .plan-breadcrumb {
+  color: #64748b;
+}
+.sp-shell.light .plan-breadcrumb a:hover,
+[data-theme="light"] .sp-shell .plan-breadcrumb a:hover {
+  color: #0f172a;
+}
+.sp-shell.light .plan-sim-stats,
+[data-theme="light"] .sp-shell .plan-sim-stats {
+  gap: 12px;
+}
+.sp-shell.light .plan-sim-stats > div,
+[data-theme="light"] .sp-shell .plan-sim-stats > div {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.sp-shell.light .plan-sim-stats span,
+[data-theme="light"] .sp-shell .plan-sim-stats span {
+  color: #64748b;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+.sp-shell.light .plan-sim-stats strong,
+[data-theme="light"] .sp-shell .plan-sim-stats strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+.sp-shell.light .plan-segmented,
+[data-theme="light"] .sp-shell .plan-segmented {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+}
+.sp-shell.light .plan-segmented button,
+[data-theme="light"] .sp-shell .plan-segmented button {
+  color: #64748b;
+}
+.sp-shell.light .plan-segmented button:hover,
+[data-theme="light"] .sp-shell .plan-segmented button:hover {
+  color: #0f172a;
+}
+.sp-shell.light .plan-segmented button.active,
+[data-theme="light"] .sp-shell .plan-segmented button.active {
+  color: #0f172a;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.sp-shell.light .plan-theory-code,
+[data-theme="light"] .sp-shell .plan-theory-code {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #0f172a;
+  font-weight: 500;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+.sp-shell.light .plan-comparison td,
+[data-theme="light"] .sp-shell .plan-comparison td {
+  border-top-color: #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+}
+.sp-shell.light .plan-comparison td strong,
+[data-theme="light"] .sp-shell .plan-comparison td strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+.sp-shell.light .plan-comparison th,
+[data-theme="light"] .sp-shell .plan-comparison th {
+  color: #475467;
+}
+.sp-shell.light .plan-note-list li,
+[data-theme="light"] .sp-shell .plan-note-list li {
+  color: #334155;
+  font-size: 12.5px;
+}
+.sp-shell.light .plan-note-list li strong,
+[data-theme="light"] .sp-shell .plan-note-list li strong {
+  color: #0f172a;
+  font-weight: 600;
+}
+.sp-shell.light .plan-note-list li:before,
+[data-theme="light"] .sp-shell .plan-note-list li:before {
+  background: #059669;
+}
+.sp-shell.light .plan-small,
+[data-theme="light"] .sp-shell .plan-small {
+  color: #475467;
+  font-size: 12px;
+}
+.sp-shell.light .editor-canvas-wrap,
+[data-theme="light"] .sp-shell .editor-canvas-wrap {
+  background-color: #f8fafc;
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+}
+.sp-shell.light .editor-toolbar,
+.sp-shell.light .editor-footer,
+.sp-shell.light .editor-hint,
+[data-theme="light"] .sp-shell .editor-toolbar,
+[data-theme="light"] .sp-shell .editor-footer,
+[data-theme="light"] .sp-shell .editor-hint {
+  border-color: #e2e8f0;
+  color: #475467;
+  background: #ffffff;
+}
+.sp-shell.light .editor-tools,
+[data-theme="light"] .sp-shell .editor-tools {
+  border-bottom-color: #e2e8f0;
+}
+.sp-shell.light .editor-tools button,
+[data-theme="light"] .sp-shell .editor-tools button {
+  color: #475467;
+}
+.sp-shell.light .editor-tools button:hover:not(.selected),
+[data-theme="light"] .sp-shell .editor-tools button:hover:not(.selected) {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+.sp-shell.light .editor-tools button.selected,
+[data-theme="light"] .sp-shell .editor-tools button.selected {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  font-weight: 600;
+}
+.sp-shell.light .plan-sim-controls button,
+[data-theme="light"] .sp-shell .plan-sim-controls button {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #1e293b;
+}
+.sp-shell.light .plan-sim-controls button:hover:not(:disabled),
+[data-theme="light"] .sp-shell .plan-sim-controls button:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+.sp-shell.light .plan-sim-controls .play,
+[data-theme="light"] .sp-shell .plan-sim-controls .play {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+.sp-shell.light .plan-sim-controls .play:hover:not(:disabled),
+[data-theme="light"] .sp-shell .plan-sim-controls .play:hover:not(:disabled) {
+  background: #1e293b;
+  border-color: #1e293b;
+}
+.sp-shell.light .plan-legend,
+[data-theme="light"] .sp-shell .plan-legend {
+  color: #475467;
+}
+.sp-shell.light .plan-mono,
+[data-theme="light"] .sp-shell .plan-mono {
+  color: #334155;
+}
+.sp-shell.light .plan-people-buttons button,
+[data-theme="light"] .sp-shell .plan-people-buttons button {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #0f172a;
+}
+.sp-shell.light .plan-people-buttons button.active,
+[data-theme="light"] .sp-shell .plan-people-buttons button.active {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+  font-weight: 600;
+}
+.sp-shell.light .plan-people-buttons span,
+[data-theme="light"] .sp-shell .plan-people-buttons span {
+  color: #64748b;
+}
+.sp-shell.light .plan-checkbox,
+[data-theme="light"] .sp-shell .plan-checkbox {
+  color: #334155;
+}
+.sp-shell.light .plan-checkbox span,
+[data-theme="light"] .sp-shell .plan-checkbox span {
+  color: #334155 !important;
+}
+.sp-shell.light .plan-text-btn,
+[data-theme="light"] .sp-shell .plan-text-btn {
+  color: #059669 !important;
+}
+.sp-shell.light .plan-text-btn:hover,
+[data-theme="light"] .sp-shell .plan-text-btn:hover {
+  color: #047857 !important;
+}
+.sp-shell.light .plan-status,
+[data-theme="light"] .sp-shell .plan-status {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #475467;
+}
+.sp-shell.light .plan-safety-note,
+[data-theme="light"] .sp-shell .plan-safety-note {
+  color: #64748b;
+}
+.sp-shell.light .plan-safety-note p,
+[data-theme="light"] .sp-shell .plan-safety-note p {
+  color: #64748b;
 }
 .sp-shell.light .plan-file-strip,
 [data-theme="light"] .sp-shell .plan-file-strip {
   background: #ffffff;
-  border-color: #e2e4e9;
+  border-color: #e2e8f0;
 }
 .sp-shell.light .candidate-row,
 [data-theme="light"] .sp-shell .candidate-row {
-  border-color: #e2e4e9;
+  border-color: #e2e8f0;
 }
 .sp-shell.light .candidate-row.focused,
 [data-theme="light"] .sp-shell .candidate-row.focused {
@@ -419,9 +628,9 @@
 .sp-shell.light .plan-sim-header select,
 [data-theme="light"] .sp-shell .plan-form-row select,
 [data-theme="light"] .sp-shell .plan-sim-header select {
-  color: #111215;
+  color: #0f172a;
   background: #ffffff;
-  border-color: #d0d5dd;
+  border-color: #cbd5e1;
 }
 @media(max-width:1040px) { .workspace-head { align-items: flex-start; flex-direction: column; } .auth-layout { grid-template-columns: 1fr 380px; gap: 36px; } .plan-library { grid-template-columns: repeat(2,minmax(0,1fr)); } .metric-strip { grid-template-columns: repeat(2,1fr); gap: 20px 0; } .metric-strip > div:nth-child(n+3) { border-top: 1px solid #282a2f; padding-top: 18px; } .metric-strip > div:nth-child(2n+1) { border-left: 0; } }
 @media(max-width:800px) { .workspace-columns,.profile-columns { grid-template-columns: 1fr; } .auth-layout { grid-template-columns: 1fr; max-width: 480px; margin: 4px auto; } .auth-intro p { max-width: none; } .auth-intro .site-link { margin-top: 8px; } }
