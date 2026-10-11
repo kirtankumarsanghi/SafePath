@@ -1,0 +1,8 @@
+[
+  { "label": "Home", "href": "/" },
+  { "label": "Dashboard", "href": "/dashboard" },
+  { "label": "Floor plans", "href": "/maps" },
+  { "label": "Simulator", "href": "/simulator" },
+  { "label": "Theory", "href": "/theory" },
+  { "label": "History", "href": "/runs" }
+]

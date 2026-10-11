@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "./planner.css";
+@import "./shell.css";
+@custom-variant dark (&:where(.dark, .dark *));
+@theme { --font-sans: "Inter", "Segoe UI", system-ui, sans-serif; }
+html { background: #08090b; scroll-behavior: smooth; }
+body { margin: 0; background: #08090b; color: #f4f4f2; font-family: "Inter", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-track { background: #101114; }
+::-webkit-scrollbar-thumb { background: #3e4148; border-radius: 4px; }
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior: auto; } }

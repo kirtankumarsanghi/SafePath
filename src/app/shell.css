@@ -1,0 +1,134 @@
+/* Workspace styling. Navigation is deliberately NOT styled here: it comes
+   from /site.css, the very same stylesheet loaded by the static homepage. */
+.sp-shell { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: #08090b; color: #f4f4f2; font-family: "Inter", "Segoe UI", system-ui, sans-serif; }
+.sp-main { flex: 1; min-width: 0; }
+.sp-main__inner { max-width: 1280px; width: calc(100% - var(--site-gutter,48px) * 2); margin: 0 auto; padding: 44px 0 64px; }
+.sp-shell :where(h1,h2,h3,h4,p) { margin-top: 0; }
+.sp-shell h1 { font-family: var(--site-font,"Inter",sans-serif); font-weight: 500; letter-spacing: -1.5px; color: #f4f4f2; line-height: 1.15; }
+.sp-shell h2,.sp-shell h3 { font-weight: 500; letter-spacing: -.3px; }
+.sp-shell :where(button,input,select,textarea):focus-visible { outline: 2px solid #a4b9a8; outline-offset: 3px; }
+.sp-shell input[type=checkbox], .sp-shell input[type=range] { accent-color: #c2d1c5; }
+.workspace-kicker { color: #9ca69e; font-size: 10px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; display: block; margin-bottom: 12px; }
+.workspace-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 30px; }
+.workspace-head h1 { margin: 0 0 11px; font-size: clamp(28px,3.4vw,42px); }
+.workspace-head p { color: #a1a3a8; font-size: 13px; line-height: 1.8; margin: 0; max-width: 590px; }
+.workspace-actions { display: flex; align-items: center; gap: 9px; flex-shrink: 0; flex-wrap: wrap; }
+.workspace-alert { font-size: 12px; line-height: 1.8; padding: 13px 16px; border: 1px solid #624544; border-radius: 8px; background: #201615; color: #f4b4a5; margin: 18px 0; }
+.workspace-alert.success { border-color: #30493b; background: #152018; color: #b9dec4; }
+.workspace-panel { background: #121316; border: 1px solid #282a2f; border-radius: 12px; padding: 24px; }
+.workspace-empty { background: #101114; border: 1px dashed #33363b; border-radius: 10px; padding: 40px 24px; text-align: center; }
+.workspace-empty h2,.workspace-empty h3 { font-size: 18px; margin: 0 0 9px; font-weight: 500; }
+.workspace-empty p { font-size: 12px; color: #a1a3a8; line-height: 1.8; margin: 0 auto 20px; max-width: 420px; }
+.workspace-section { margin-top: 36px; }
+.workspace-section-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.workspace-section-head h2 { margin: 0; font-size: 18px; }
+.workspace-section-head p { font-size: 11px; color: #858990; margin: 4px 0 0; }
+.workspace-skeleton { min-height: 190px; border: 1px solid #24262b; border-radius: 12px; background: linear-gradient(110deg,#101114 30%,#1b1d21 45%,#101114 60%); background-size: 240% 100%; animation: workspace-load 1.9s ease infinite; }
+@keyframes workspace-load { to { background-position: -140% 0; } }
+.metric-strip { display: grid; grid-template-columns: repeat(4,1fr); border: 1px solid #282a2f; border-radius: 12px; background: #111215; margin: 30px 0; padding: 22px 0; }
+.metric-strip > div { padding: 0 22px; }
+.metric-strip > div + div { border-left: 1px solid #282a2f; }
+.metric-strip dt { color: #9b9da4; font-size: 10px; font-family: var(--site-mono, monospace); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; }
+.metric-strip dd { margin: 0; font-size: 32px; color: #f1f1ee; letter-spacing: -1px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.metric-strip small { color: #7d8188; display: block; font-size: 10px; margin-top: 10px; }
+.plan-library { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+.plan-tile { min-width: 0; background: #121316; border: 1px solid #282a2f; border-radius: 12px; overflow: hidden; transition: border-color .2s ease, transform .2s ease; }
+.plan-tile:hover { border-color: #52565d; transform: translateY(-2px); }
+.plan-tile__preview { display: flex; align-items: center; justify-content: center; height: 180px; padding: 16px 24px; background: #0c0e11; border-bottom: 1px solid #282a2f; text-decoration: none; position: relative; }
+.plan-tile__preview::after { content: " Blueprints "; position: absolute; top: 12px; left: 12px; font-family: var(--site-mono, monospace); font-size: 8px; font-weight: 500; letter-spacing: 0.1em; color: #8c8f94; padding: 3px 6px; border: 1px solid #22252a; background: #111215; text-transform: uppercase; }
+.plan-tile__preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.plan-tile__body { padding: 20px; }
+.plan-tile__body h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; line-height: 1.55; min-height: 24px; color: #f1f1ee; }
+.plan-tile__body p { font-size: 11px; line-height: 1.7; color: #9b9da4; margin: 0 0 14px; min-height: 38px; }
+.plan-tile__facts { display: flex; flex-wrap: wrap; gap: 7px 12px; color: #888d95; font-size: 10px; margin-bottom: 19px; font-variant-numeric: tabular-nums; }
+.plan-tile__actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-top: 1px solid #282a2f; padding-top: 15px; }
+.plan-tile__delete { padding: 2px 0; border: 0; background: transparent; font-size: 10px; color: #a5a4a2; cursor: pointer; }
+.plan-tile__delete:hover { color: #f4b4a5; text-decoration: underline; }
+.plan-library-toolbar { display: flex; gap: 18px; align-items: center; margin-bottom: 22px; justify-content: space-between; }
+.plan-library-toolbar input { width: min(360px,100%); border: 1px solid #33363c; border-radius: 7px; font-size: 12px; color: #ddd; padding: 11px 13px; background: #131519; }
+.plan-library-toolbar > span { color: #8c9098; font-size: 11px; white-space: nowrap; }
+.workspace-columns { display: grid; grid-template-columns: minmax(0,1fr) 280px; gap: 24px; margin-top: 36px; }
+.workspace-columns .workspace-section { margin-top: 0; }
+.workspace-guide { align-self: start; background: #121316; border: 1px solid #282a2f; border-radius: 12px; padding: 22px; }
+.workspace-guide h2 { font-size: 14px; margin: 0 0 22px; }
+.workspace-guide ol { list-style: none; padding: 0; margin: 0; counter-reset: guide; }
+.workspace-guide li { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin-bottom: 22px; }
+.workspace-guide li::before { counter-increment: guide; content: "0" counter(guide); color: #7d8580; font-size: 10px; padding-top: 1px; }
+.workspace-guide strong { font-size: 12px; font-weight: 500; display: block; }
+.workspace-guide p { font-size: 11px; color: #93979e; margin: 6px 0 0; line-height: 1.8; }
+.workspace-guide > a { padding-top: 16px; border-top: 1px solid #282a2f; display: block; }
+.workspace-table-wrap { width: 100%; overflow-x: auto; border: 1px solid #282a2f; border-radius: 10px; background: #111215; }
+.workspace-table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
+.workspace-table th { background: #181a1e; color: #9b9fa6; font-size: 10px; font-weight: 500; padding: 14px 18px; white-space: nowrap; }
+.workspace-table td { border-top: 1px solid #282a2f; color: #c5c7cc; padding: 17px 18px; vertical-align: middle; }
+.workspace-table tr:hover td { background: #181a1e; }
+.workspace-table .name { color: #e8e9e5; font-weight: 500; min-width: 230px; }
+.workspace-table .name small { display: block; margin-top: 5px; color: #858a92; font-size: 10px; font-weight: 400; }
+.workspace-table .number { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.workspace-table .status { font-size: 10px; color: #a9bbad; }
+.workspace-meta { color: #858a92; font-size: 10px; margin-top: 10px; }
+.auth-layout { display: grid; grid-template-columns: minmax(0,1fr) 420px; gap: clamp(40px,7vw,100px); max-width: 980px; margin: 35px auto; align-items: center; }
+.auth-intro h1 { font-size: clamp(30px,3.5vw,45px); letter-spacing: -1.7px; margin: 0 0 20px; }
+.auth-intro p { color: #9b9fa7; line-height: 1.9; font-size: 13px; max-width: 400px; }
+.auth-intro .site-link { margin-top: 20px; display: inline-block; }
+.account-form h2 { font-size: 20px; margin: 0 0 8px; }
+.account-form > p { color: #9599a1; font-size: 12px; line-height: 1.7; margin-bottom: 22px; }
+.account-form label { display: block; color: #b9bcc2; font-size: 11px; margin: 18px 0 8px; }
+.account-form input { width: 100%; border: 1px solid #373a40; color: #f4f4f2; border-radius: 7px; background: #0e1013; padding: 12px; font-size: 13px; min-height: 44px; }
+.account-form input:disabled { color: #8d929a; }
+.account-form .site-button { width: 100%; margin-top: 24px; }
+.account-form .password-wrap { position: relative; }
+.account-form .password-wrap input { padding-right: 68px; }
+.account-form .password-wrap button { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #b4b8c0; font-size: 11px; background: transparent; border: 0; cursor: pointer; }
+.account-form .auth-switch { border: 0; background: none; color: #cdd1cf; font-size: 12px; width: 100%; padding: 14px 0 0; cursor: pointer; }
+.account-form .auth-switch:hover { text-decoration: underline; }
+.auth-demo { margin-top: 20px; font-size: 10px; color: #888d95; text-align: center; }
+.auth-demo button { margin-left: 5px; color: #c7cec8; background: none; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 11px; }
+.account-session { color: #9ca8a0; margin-bottom: 22px; font-size: 12px; }
+.profile-columns { display: grid; grid-template-columns: minmax(0,620px) 280px; gap: 26px; }
+
+/* All existing planning controls keep their labels and behaviors, with the
+   same neutral typography and spacing as the other pages. Semantic search
+   colors remain inside the grid and status messages, not decorative cards. */
+.sp-shell .planner { --p-bg: #121316; --p-soft: #0e1013; --p-ink: #f1f2ee; --p-muted: #a1a3a8; --p-line: #2c2e34; --p-orange: #c3d0c5; --p-tint: #1b2420; max-width: none; font-family: var(--site-font,"Inter",sans-serif); }
+.sp-shell .plan-page-heading h1 { font-size: clamp(28px,3.3vw,40px); font-weight: 500; letter-spacing: -1.4px; }
+.sp-shell .plan-page-heading p { font-size: 12px; max-width: 730px; line-height: 1.8; }
+.sp-shell .plan-card { border-radius: 12px; box-shadow: none; }
+.sp-shell .plan-card h2,.sp-shell .plan-card h3 { font-weight: 500; }
+.sp-shell .plan-section-heading h3 > svg { display: none; }
+.sp-shell .plan-btn { border-radius: 7px; font-family: var(--site-font,"Inter",sans-serif); font-weight: 500 !important; text-transform: none; letter-spacing: 0; font-size: 12px !important; min-height: 40px; }
+.sp-shell .plan-btn.primary { background: #f1f1ee; border-color: #f1f1ee; color: #1a1b1e; box-shadow: none; }
+.sp-shell .plan-btn.primary:hover:not(:disabled) { background: #fff; border-color: #fff; transform: none; }
+.sp-shell .plan-btn.secondary { background: #1c1e22; border-color: #383b41; color: #e4e4e1; }
+.sp-shell .plan-btn.secondary:hover:not(:disabled) { background: #292c31; }
+.sp-shell .plan-eyebrow { font-size: 9px; letter-spacing: .12em; }
+.sp-shell .plan-stepper { background: #121316; border-radius: 10px; }
+.sp-shell .plan-stepper strong { font-weight: 500; }
+.sp-shell .plan-stepper > button.active { background: #1b2420; }
+.sp-shell .active .step-number { background: #b9cdbd; border-color: #b9cdbd; color: #141a16; }
+.sp-shell .plan-stat-strip { background: #111316; border-radius: 10px; }
+.sp-shell .plan-stat-strip strong { font-size: 23px; font-weight: 500; }
+.sp-shell .plan-stat-strip svg { display: none; }
+.sp-shell .plan-stat-strip > div { padding: 17px; }
+.sp-shell .plan-dropzone { border-color: #4a4e57; border-radius: 9px; background-color: #0c0e11; }
+.sp-shell .plan-dropzone:hover,.sp-shell .plan-dropzone.dragging { border-color: #b9cdbd; background-color: #141c17; }
+.sp-shell .upload-glyph { border-radius: 12px; color: #b9cdbd; box-shadow: none; }
+.sp-shell .editor-canvas-wrap { background-color: #0c0e11; background-image: radial-gradient(#6e757f25 1px,transparent 1px); }
+.sp-shell .editor-tools button.selected { background: #28392d; border-color: #53705b; color: #d2ead7; }
+.sp-shell .plan-segmented button.active { color: #e9efe9; background: #323a34; }
+.sp-shell .plan-checkbox input,.sp-shell .plan-settings input[type=range],.sp-shell .plan-sim-progress input { accent-color: #b9cdbd; }
+.sp-shell .plan-sim-controls .play { background: #f1f1ee; color: #16181b; border-color: #f1f1ee; }
+.sp-shell .plan-success-bar { border-radius: 8px; color: #b9dec4; background: #13251a; border-color: #35583f; }
+.sp-shell .plan-alert.error { color: #f1b4a8; background: #251815; border-color: #62433d; }
+.sp-shell .plan-route-results .success { color: #b8e6c9; background: #15231a; border-color: #35583f; }
+.sp-shell .plan-route-results .failed { color: #ebbb8b; background: #271e14; border-color: #5d4830; }
+.sp-shell .plan-route-results p { color: #b1b8b2; }
+.sp-shell .plan-pill.green { background: #1e3626; color: #b8e6c9; }
+.sp-shell .candidate-actions button.accept { background: #1e3626; color: #b8e6c9; border-color: #35583f; }
+.sp-shell .plan-sim-stats strong { font-size: 22px; font-weight: 500; }
+.sp-shell select,.sp-shell input,.sp-shell textarea { color-scheme: dark; }
+.sp-shell .plan-form-row select,.sp-shell .plan-sim-header select { color: #e0e1df; }
+@media(max-width:1040px) { .workspace-head { align-items: flex-start; flex-direction: column; } .auth-layout { grid-template-columns: 1fr 380px; gap: 36px; } .plan-library { grid-template-columns: repeat(2,minmax(0,1fr)); } .metric-strip { grid-template-columns: repeat(2,1fr); gap: 20px 0; } .metric-strip > div:nth-child(n+3) { border-top: 1px solid #282a2f; padding-top: 18px; } .metric-strip > div:nth-child(2n+1) { border-left: 0; } }
+@media(max-width:800px) { .workspace-columns,.profile-columns { grid-template-columns: 1fr; } .auth-layout { grid-template-columns: 1fr; max-width: 480px; margin: 4px auto; } .auth-intro p { max-width: none; } .auth-intro .site-link { margin-top: 8px; } }
+@media(max-width:600px) { .sp-main__inner { padding: 30px 0 44px; } .workspace-head h1 { font-size: 30px; } .plan-library { grid-template-columns: 1fr; } .metric-strip > div { padding: 0 13px; } .metric-strip dd { font-size: 25px; } .metric-strip small { font-size: 9px; } .metric-strip dt { font-size: 10px; } .plan-tile__preview { height: 180px; } .workspace-panel { padding: 20px; } .workspace-head { gap: 18px; } .plan-library-toolbar { flex-wrap: wrap; gap: 10px; } .plan-library-toolbar input { width: 100%; } }
+@media(prefers-reduced-motion:reduce) { .workspace-skeleton { animation: none; } }

@@ -1,0 +1,48 @@
+{
+  "name": "nextjs-postgresql-template",
+  "private": true,
+  "scripts": {
+    "dev": "node ./scripts/run-cmd.cjs dev",
+    "build": "node ./scripts/run-cmd.cjs build",
+    "start": "node ./scripts/run-cmd.cjs start",
+    "db": "node ./scripts/run-cmd.cjs db",
+    "seed": "node ./scripts/run-cmd.cjs seed",
+    "test:unit": "node ./scripts/run-cmd.cjs test:unit",
+    "test:e2e": "node ./scripts/run-cmd.cjs test:e2e",
+    "test": "node ./scripts/run-cmd.cjs test:unit",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.64.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "17.3.1",
+    "drizzle-orm": "0.45.2",
+    "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.54.0",
+    "next": "16.2.6",
+    "pg": "8.20.0",
+    "pg-gateway": "^0.3.0-beta.4",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "sharp": "^0.35.5",
+    "tesseract.js": "^7.0.0",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.17",
+    "@types/node": "22.19.15",
+    "@types/pg": "8.18.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.2.6",
+    "postcss": "8.5.8",
+    "tailwindcss": "4.1.17",
+    "typescript": "5.9.3"
+  }
+}

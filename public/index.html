@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafePath — Algorithmic Evacuation Planning</title>
+  <meta name="description" content="A structural routing engine and A* pathfinding system. Convert floor plans to verified graphs and trace escape routes in real time." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/site.css" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+<div class="landing-page">
+  <header class="site-header"><div class="site-header__inner">
+    <a class="site-brand" href="/" aria-label="SafePath home"><span class="site-brand__mark"><img src="/assets/logo.webp" alt="" width="34" height="34" /></span><span>SafePath</span></a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a href="/" aria-current="page">Home</a><a href="/dashboard">Dashboard</a><a href="/maps">Floor plans</a><a href="/simulator">Simulator</a><a href="/theory">Theory</a><a href="/runs">History</a>
+    </nav>
+    <a class="site-account" href="/auth">Sign in</a>
+    <button id="site-menu-button" class="site-menu-button" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="Open menu"><span></span><span></span><span></span></button>
+  </div></header>
+  <div id="site-menu" class="site-menu" role="dialog" aria-modal="true" aria-label="Site menu" hidden><div class="site-menu__panel">
+    <nav aria-label="Mobile navigation"><a href="/" aria-current="page">Home</a><a href="/dashboard">Dashboard</a><a href="/maps">Floor plans</a><a href="/simulator">Simulator</a><a href="/theory">Theory</a><a href="/runs">History</a></nav>
+    <a class="site-menu__account" href="/auth">Sign in</a><a class="site-menu__action" href="/maps/new">Upload a floor plan</a>
+  </div></div>
+
+  <main class="landing-main">
+    <div class="landing-media" aria-hidden="true">
+      <video class="bg-video" autoplay muted loop playsinline preload="metadata">
+        <source src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260809_012548_ef22562c-c0ae-4816-ad9d-f8922af4e6a7.mp4" type="video/mp4" />
+      </video>
+    </div>
+
+    <section class="landing-hero" aria-labelledby="landing-title">
+      <div class="landing-copy">
+        <div class="landing-kicker"> Algorithmic routing framework</div>
+        <h1 id="landing-title">Intelligence<br />Designed To Evolve.</h1>
+        <p class="landing-lede">SafePath compiles raw floor plan drawings into mathematically verifiable building graphs. Isolate structural partitions, mark exits against legal blueprints, and simulate optimal escape paths using custom A* heuristic models.</p>
+        <div class="landing-actions"><a class="site-button primary" href="/maps/new">Upload building plan</a><a class="site-button" href="/simulator">Launch A* simulator</a></div>
+        <a class="landing-text-link" href="/maps">Existing workstation? Open saved maps <span class="arrow-glyph">&rarr;</span></a>
+
+        <div class="specs-grid">
+          <div class="spec-unit">
+            <span class="spec-unit__icon">&lt;</span>
+            <div>
+              <strong>Heuristic Admissibility</strong>
+              <p>Estimates h(n) &le; h*(n) to guarantee optimal path computation.</p>
+            </div>
+          </div>
+          <div class="spec-unit">
+            <span class="spec-unit__icon">%</span>
+            <div>
+              <strong>Strict Pixel Overlap</strong>
+              <p>Cell coordinates map directly back to original blueprints.</p>
+            </div>
+          </div>
+          <div class="spec-unit">
+            <span class="spec-unit__icon">#</span>
+            <div>
+              <strong>Exclusion Boundaries</strong>
+              <p>Unreviewed text or annotations do not contaminate navigable area.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="landing-terminal-group">
+        <figure class="landing-visual">
+          <figcaption class="plan-frame__bar"><span class="plan-frame__dot" aria-hidden="true"></span><span class="plan-frame__title">Dynamic Graph Solver</span><span class="plan-frame__meta" id="plan-status">Grid 34 × 22 · walls and rooms</span></figcaption>
+          <div class="plan-frame__canvas">
+            <canvas id="plan-canvas" width="820" height="480" role="img" aria-label="Illustration of an A* search on a floor-plan grid: walls and rooms, a person, two verified exits, the explored cells and the selected route to the nearest exit."></canvas>
+          </div>
+          <ul class="plan-legend" aria-label="What the illustration shows">
+            <li><span class="swatch swatch--person" aria-hidden="true"></span>Person</li>
+            <li><span class="swatch swatch--explored" aria-hidden="true"></span>Explored frontier</li>
+            <li><span class="swatch swatch--route" aria-hidden="true"></span>A* path</li>
+            <li><span class="swatch swatch--exit" aria-hidden="true"></span>Exit node</li>
+          </ul>
+        </figure>
+
+        <div class="terminal-log">
+          <div class="terminal-log__header">
+            <span>ENGINE CONSOLE LOG</span>
+            <span class="status-indicator">ON</span>
+          </div>
+          <div class="terminal-log__body" id="console-log">
+            <div class="terminal-row sys">[SYS] Initializing SafePath A* routing engine...</div>
+            <div class="terminal-row sys">[SYS] Blueprints loaded. Width: 34, Height: 22.</div>
+            <div class="terminal-row sys">[SYS] Grid graph vertices: 748, edges: 1496.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="landing-workflow" aria-label="Planning workflow">
+      <a href="/maps/new"><span class="workflow-number">01</span><div><strong>01 /blueprints</strong><p>Analyze structural contours from raw PNG or JPG drawings.</p></div></a>
+      <a href="/maps"><span class="workflow-number">02</span><div><strong>02 /refinement</strong><p>Identify partition doors and verify egress coordinate nodes.</p></div></a>
+      <a href="/simulator"><span class="workflow-number">03</span><div><strong>03 /simulation</strong><p>Run search passes step-by-step and inspect heap logs.</p></div></a>
+    </nav>
+  </main>
+
+  <footer class="site-footer"><div class="site-footer__inner"><p>SafePath is an algorithmic routing tool for educational and planning purposes. Real-world conditions must be checked by safety officials. Always follow local structural exit guidelines during an evacuation.</p><a href="/theory">Understand the model</a></div></footer>
+</div>
+<script src="/main.js"></script>
+</body>
+</html>
