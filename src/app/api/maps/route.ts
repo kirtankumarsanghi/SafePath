@@ -46,13 +46,6 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!isDatabaseConfigured) {
-      return NextResponse.json(
-        { error: "PostgreSQL database is not configured. Please set DATABASE_URL in Vercel Project Settings to persist plans." },
-        { status: 503 }
-      );
-    }
-    await ensureDatabaseReady();
     if (Number(req.headers.get("content-length") ?? 0) > 23_000_000) return NextResponse.json({ error: "The reviewed map and original image exceed the 23 MB storage limit. Use a smaller source image." }, { status: 413 });
     const body = await req.json();
     const input = parseMapInput(body);
@@ -67,6 +60,32 @@ export async function POST(req: NextRequest) {
       const unreachable = results.map((r, i) => r.reached ? null : `Person ${i + 1}: ${r.reason ?? "no route"}`).filter(Boolean);
       if (unreachable.length) return NextResponse.json({ error: `No valid route for every person; map was not saved as a successful run. ${unreachable.join(" ")}`, results }, { status: 422 });
     }
+
+    if (!isDatabaseConfigured) {
+      const nextId = Math.max(...SAMPLE_MAPS.map(m => m.id), 3) + 1;
+      const demoMap: any = {
+        id: nextId,
+        userId: userId ?? 1,
+        title: input.title,
+        description: input.description ?? "",
+        gridWidth: input.gridWidth,
+        gridHeight: input.gridHeight,
+        gridData: input.gridData,
+        exits: input.exits,
+        starts: input.starts,
+        obstacles: input.obstacles,
+        imageUrl: input.imageUrl ?? null,
+        sourceImage: null,
+        isPublic: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        analysis: input.analysis,
+      };
+      SAMPLE_MAPS.unshift(demoMap);
+      return NextResponse.json({ map: publicMap(demoMap), run: null }, { status: 201 });
+    }
+
+    await ensureDatabaseReady();
     const saved = await db.transaction(async tx => {
       const [map] = await tx.insert(floorMaps).values({ ...input, userId, isPublic: false }).returning();
       let run = null;

@@ -3,7 +3,7 @@ import sharp from "sharp";
 import path from "node:path";
 import { createWorker, PSM, type Worker } from "tesseract.js";
 import {
-  buildPlanObjects, classifyLabel, convertPixels, detectCandidates, detectLegendRegions, semanticCounts, suggestedOptions,
+  buildPlanObjects, classifyLabel, convertPixels, detectCandidates, detectLegendRegions, semanticCounts, suggestedOptions, validationFor,
   type AnalysisReport, type Bounds, type PlanLabel,
 } from "@/lib/map-analysis";
 import { darkSignRegions } from "@/lib/sign-regions";
@@ -27,11 +27,14 @@ async function recognize(buffer: Buffer, width: number, height: number, regions:
   });
   initializing.then(w => { if (cancelled) void w.terminate(); }, () => {});
   try {
-    worker = await deadline(Promise.race([initializing, failed]), 14000);
-    const end = Date.now() + 33000;
+    const isVercel = Boolean(process.env.VERCEL);
+    const initTimeout = isVercel ? 4000 : 14000;
+    const recTimeout = isVercel ? 5000 : 26000;
+    worker = await deadline(Promise.race([initializing, failed]), initTimeout);
+    const end = Date.now() + (isVercel ? 6000 : 33000);
     const ocrImage = invert ? await sharp(buffer).grayscale().negate().normalise().png().toBuffer() : buffer;
     await worker.setParameters({ tessedit_pageseg_mode: PSM.SPARSE_TEXT, user_defined_dpi: "150" });
-    const { data } = await deadline(Promise.race([worker.recognize(ocrImage, {}, { blocks: true, text: true }), failed]), 26000);
+    const { data } = await deadline(Promise.race([worker.recognize(ocrImage, {}, { blocks: true, text: true }), failed]), recTimeout);
     const labels: PlanLabel[] = [];
     for (const block of data.blocks ?? []) for (const paragraph of block.paragraphs) for (const line of paragraph.lines) {
       const text = line.text.replace(/\s+/g, " ").trim();
@@ -49,7 +52,7 @@ async function recognize(buffer: Buffer, width: number, height: number, regions:
       try {
         const signImage = await sharp(buffer).extract({ left, top, width: sw, height: sh }).resize({ width: Math.min(800, Math.max(360, sw * 4)) }).grayscale().negate().normalise().threshold(150).extend({ top: 12, bottom: 12, left: 12, right: 12, background: "white" }).png().toBuffer();
         await worker.setParameters({ tessedit_pageseg_mode: PSM.SINGLE_LINE });
-        const { data: text } = await deadline(Promise.race([worker.recognize(signImage, {}, { text: true }), failed]), Math.min(3500, end - Date.now()));
+        const { data: text } = await deadline(Promise.race([worker.recognize(signImage, {}, { text: true }), failed]), Math.min(3000, Math.max(500, end - Date.now())));
         const clean = text.text.replace(/\s+/g, " ").trim(), kind = classifyLabel(clean);
         if (text.confidence >= 45 && ["exit", "legend", "equipment", "first-aid", "assembly", "hazard"].includes(kind) && !labels.some(l => l.kind === kind && Math.hypot((l.box.left + l.box.right) / 2 - cx, (l.box.top + l.box.bottom) / 2 - cy) < .03)) labels.push({ text: clean, confidence: text.confidence, scoreType: "tesseract-raw", kind, box, });
       } catch { break; }
@@ -57,19 +60,7 @@ async function recognize(buffer: Buffer, width: number, height: number, regions:
     return labels.slice(0, 1000);
   } finally { cancelled = true; if (worker) await worker.terminate().catch(() => {}); }
 }
-function validationFor(labels: PlanLabel[], candidates: ReturnType<typeof detectCandidates>, conversion: AnalysisReport["conversion"], objects: ReturnType<typeof buildPlanObjects>, legends: ReturnType<typeof detectLegendRegions>) {
-  const exitSigns = objects.filter(o => o.semanticClass === "EXIT_SIGN").length;
-  const explicitHazardText = objects.filter(o => o.semanticClass === "FIRE_HAZARD").length;
-  const forbiddenColorHazards = candidates.filter(c => c.source === "color" && c.kind === "hazard").length;
-  return [
-    ...conversion.validation,
-    { id: "legend-exclusion", status: legends.length ? "REVIEW" as const : "REVIEW" as const, message: legends.length ? `${legends.length} legend region(s) and their text are excluded from the navigation grid. Check the boundary and legend entries.` : "No reliable legend heading was identified. Colored marks cannot be interpreted against a legend that has not been located.", count: legends.length },
-    { id: "exit-semantics", status: exitSigns ? "REVIEW" as const : "REVIEW" as const, message: exitSigns ? `${exitSigns} OCR exit-sign label(s) are candidates only; the label is not a verified, passable exit door. Place each exit at a manually checked doorway.` : "No text-confirmed exit sign was found. Mark real doorways manually; no exits were inferred from green pixels.", count: exitSigns },
-    { id: "fire-equipment-separation", status: forbiddenColorHazards === 0 ? "PASS" as const : "FAIL" as const, message: "Red/green color regions are generic annotations. Fire extinguishers and alarms are OCR equipment classes, never active-fire cells.", count: objects.filter(o => ["FIRE_EXTINGUISHER", "FIRE_ALARM"].includes(o.semanticClass)).length },
-    { id: "explicit-fire-text", status: explicitHazardText ? "REVIEW" as const : "PASS" as const, message: explicitHazardText ? `${explicitHazardText} explicitly worded fire/smoke annotation(s) need human confirmation; none was applied to the routing scenario.` : "No explicit fire-location text was found; no active fire is inferred from image colors.", count: explicitHazardText },
-    { id: "ocr-language", status: labels.length ? "REVIEW" as const : "REVIEW" as const, message: labels.length ? "English OCR engine scores are uncalibrated text-recognition measures, not semantic confidence or proof." : "No text was confidently read. Verify labels and legends manually." , count: labels.length },
-  ];
-}
+
 export async function POST(req: NextRequest) {
   if (active >= 2) return NextResponse.json({ error: "The image analyzer is busy. Please try again in a few seconds." }, { status: 429 });
   if (Number(req.headers.get("content-length") ?? 0) > 13 * 1024 * 1024) return NextResponse.json({ error: "Use an image under 12 MB." }, { status: 413 });

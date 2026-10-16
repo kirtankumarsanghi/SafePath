@@ -313,3 +313,24 @@ export function candidatePosition(candidate: PlanCandidate, options: ConversionO
   for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const px = cx + dx, py = cy + dy; if (px >= 0 && py >= 0 && px < options.cols && py < options.rows && !isBlocked(grid[`${px},${py}`])) choices.push({ x: px, y: py, d: dx * dx + dy * dy }); }
   choices.sort((a, b) => a.d - b.d); return choices[0] ? { x: choices[0].x, y: choices[0].y } : null;
 }
+
+export function validationFor(
+  labels: PlanLabel[],
+  candidates: PlanCandidate[],
+  conversion: ConversionResult,
+  objects: PlanObject[],
+  legends: LegendRegion[]
+): ValidationCheck[] {
+  const exitSigns = objects.filter(o => o.semanticClass === "EXIT_SIGN").length;
+  const explicitHazardText = objects.filter(o => o.semanticClass === "FIRE_HAZARD").length;
+  const forbiddenColorHazards = candidates.filter(c => c.source === "color" && c.kind === "hazard").length;
+  return [
+    ...conversion.validation,
+    { id: "legend-exclusion", status: "REVIEW" as const, message: legends.length ? `${legends.length} legend region(s) and their text are excluded from the navigation grid. Check the boundary and legend entries.` : "No reliable legend heading was identified. Colored marks cannot be interpreted against a legend that has not been located.", count: legends.length },
+    { id: "exit-semantics", status: "REVIEW" as const, message: exitSigns ? `${exitSigns} OCR exit-sign label(s) are candidates only; the label is not a verified, passable exit door. Place each exit at a manually checked doorway.` : "No text-confirmed exit sign was found. Mark real doorways manually; no exits were inferred from green pixels.", count: exitSigns },
+    { id: "fire-equipment-separation", status: forbiddenColorHazards === 0 ? "PASS" as const : "FAIL" as const, message: "Red/green color regions are generic annotations. Fire extinguishers and alarms are OCR equipment classes, never active-fire cells.", count: objects.filter(o => ["FIRE_EXTINGUISHER", "FIRE_ALARM"].includes(o.semanticClass)).length },
+    { id: "explicit-fire-text", status: explicitHazardText ? "REVIEW" as const : "PASS" as const, message: explicitHazardText ? `${explicitHazardText} explicitly worded fire/smoke annotation(s) need human confirmation; none was applied to the routing scenario.` : "No explicit fire-location text was found; no active fire is inferred from image colors.", count: explicitHazardText },
+    { id: "ocr-language", status: "REVIEW" as const, message: labels.length ? "English OCR engine scores are uncalibrated text-recognition measures, not semantic confidence or proof." : "No text was confidently read. Verify labels and legends manually.", count: labels.length },
+  ];
+}
+
