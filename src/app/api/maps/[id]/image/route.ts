@@ -6,7 +6,7 @@ import { SAMPLE_MAPS } from "@/lib/sample-data";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!/^\d+$/.test(id) || Number(id) > 2147483647) return new NextResponse(null, { status: 400 });
+  if (!/^\d+$/.test(id) || Number(id) <= 0) return new NextResponse(null, { status: 400 });
   const numId = Number(id);
 
   let rawImage: string | null = null;

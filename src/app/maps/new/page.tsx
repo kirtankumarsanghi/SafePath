@@ -68,16 +68,21 @@ export default function NewMapPage() {
   }
   async function applySettings() {
     if (!report || !doc || busy) return;
-    if (edited && !window.confirm("Re-converting replaces your manual edits and confirmed markers. Continue?")) return;
     setBusy("convert"); setError("");
     try {
       await new Promise(r => setTimeout(r, 20));
       const result = await reconvertImage(report.imageUrl, options, report.labels);
       setReport({ ...report, conversion: result }); setApplied({ ...options });
-      const withCoords = ensureValidCoordinates({ gridWidth: result.cols, gridHeight: result.rows, gridData: result.grid, starts: [], exits: [], obstacles: [] });
+      const withCoords = ensureValidCoordinates({ gridWidth: result.cols, gridHeight: result.rows, gridData: result.grid, starts: doc.starts, exits: doc.exits, obstacles: doc.obstacles });
       setDoc(withCoords.doc);
       setDecisions({}); setEvaluation(null); setReviewed(false); setEdited(false);
     } catch (e) { setError(messageOf(e)); } finally { setBusy(null); }
+  }
+  async function proceedToRefine() {
+    if (settingsDirty && report) {
+      await applySettings();
+    }
+    setStage(2);
   }
   function decide(candidate: PlanCandidate, accept: boolean) {
     if (!doc) return;
@@ -103,12 +108,28 @@ export default function NewMapPage() {
     finally { if (!abort.signal.aborted) setEvaluating(false); }
   }
   async function save(run: boolean) {
-    if (!doc || busy) return;
-    const mapTitle = title.trim() || "Uploaded floor plan";
-    if (settingsDirty) { setError("Apply or discard the pending conversion settings before saving."); return; }
+    if (!doc || busy === "save") return;
+    const mapTitle = title.trim() || fileName.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Uploaded floor plan";
     
+    let currentDoc = doc;
+    let currentOptions = applied;
+    if (settingsDirty && report) {
+      try {
+        setBusy("convert");
+        const result = await reconvertImage(report.imageUrl, options, report.labels);
+        currentOptions = { ...options };
+        setApplied(currentOptions);
+        setReport({ ...report, conversion: result });
+        const withCoords = ensureValidCoordinates({ gridWidth: result.cols, gridHeight: result.rows, gridData: result.grid, starts: doc.starts, exits: doc.exits, obstacles: doc.obstacles });
+        currentDoc = withCoords.doc;
+        setDoc(currentDoc);
+      } catch (e) {
+        console.warn("Could not reconvert before saving, continuing with active grid:", e);
+      }
+    }
+
     // Automatically guarantee at least one start and one exit
-    const { doc: finalDoc } = ensureValidCoordinates(doc);
+    const { doc: finalDoc } = ensureValidCoordinates(currentDoc);
 
     setBusy("save"); setError("");
     const isReviewed = reviewed || run;
@@ -119,15 +140,15 @@ export default function NewMapPage() {
       fileName: report.fileName,
       labels: report.labels,
       candidates: report.candidates,
-      options: applied,
+      options: currentOptions,
       ocrStatus: report.ocrStatus,
       reviewed: isReviewed,
       reviewedAt: new Date().toISOString(),
       decisions
     } : null;
 
-    // Save to local client storage immediately so it is guaranteed to persist on Vercel deployment
-    const localId = Date.now();
+    // Use a 32-bit safe integer ID
+    const localId = Math.floor(Date.now() % 1000000000) + 1000;
     const mapToSave: SavedMap = {
       ...finalDoc,
       id: localId,
@@ -175,14 +196,29 @@ export default function NewMapPage() {
         <span className="candidate-evidence">{c.source === "text" ? "Text evidence" : "Color only"}{p ? ` · proposed cell (${p.x}, ${p.y})` : " · outside crop / blocked"}</span>
         <details><summary>Why was this detected?</summary><p>{c.evidence}</p></details>
         {decision ? <div className="candidate-actions"><span>{decision === "accepted" ? "Confirmed by you" : "Dismissed"}</span><button onClick={() => { if (decision === "accepted") decide(c, false); else setDecisions(d => { const n = { ...d }; delete n[c.id]; return n; }); }}>{decision === "accepted" ? "Remove" : "Review again"}</button></div>
-        : <div className="candidate-actions">{c.kind !== "stairs" && <button disabled={!p || stage === 1} onClick={() => decide(c, true)} className="accept">{c.kind === "exit" ? "Confirm exit" : c.kind === "start" ? "Confirm position" : "Mark as blocked"}</button>}<button disabled={stage === 1} onClick={() => decide(c, false)}>Dismiss</button></div>}
+        : <div className="candidate-actions">{c.kind !== "stairs" && <button disabled={!p} onClick={() => decide(c, true)} className="accept">{c.kind === "exit" ? "Confirm exit" : c.kind === "start" ? "Confirm position" : "Mark as blocked"}</button>}<button onClick={() => decide(c, false)}>Dismiss</button></div>}
       </article>;
     })}</div>}
-    {stage === 1 && <p className="plan-small plan-emphasis">Continue to refinement to confirm or reposition markers.</p>}
+    {stage === 1 && <p className="plan-small">Click any marker above to confirm it or dismiss it, or click Save & Run A* Now to simulate immediately.</p>}
   </section>;
   return <DashboardLayout><div className="planner">
     <div className="plan-breadcrumb"><Link href="/maps">My saved maps</Link><span>/</span><span>New floor plan</span></div>
-    <header className="plan-page-heading"><div><div className="plan-eyebrow">FLOOR PLAN WORKSPACE</div><h1>From floor plan to escape route.</h1><p>Analyze your image, review the grid, and see A* find a route through your building model.</p></div><span className="plan-status"><ShieldCheck size={15} />Human-reviewed planning</span></header>
+    <header className="plan-page-heading">
+      <div>
+        <div className="plan-eyebrow">FLOOR PLAN WORKSPACE</div>
+        <h1>From floor plan to escape route.</h1>
+        <p>Analyze your image, review the grid, and see A* find a route through your building model.</p>
+      </div>
+      <div className="flex items-center gap-3">
+        {stage > 0 && doc && (
+          <button className="plan-btn primary" disabled={busy === "save" || busy === "analyze"} onClick={() => save(true)}>
+            {busy === "save" ? <Loader2 size={15} className="animate-spin inline mr-1" /> : <Route size={15} className="inline mr-1" />}
+            Save & Run A* Now
+          </button>
+        )}
+        <span className="plan-status"><ShieldCheck size={15} />Human-reviewed planning</span>
+      </div>
+    </header>
     <nav className="plan-stepper" aria-label="Upload steps">{STAGES.map((s, i) => <button key={s.title} onClick={() => { if (i === 0 && !busy) { setStage(0); return; } if (doc && !busy && (i !== 1 || report)) setStage(i); }} disabled={busy !== null || i > 0 && !doc || i === 1 && !report} className={`${stage === i ? "active" : ""} ${stage > i ? "done" : ""}`} aria-current={stage === i ? "step" : undefined}><span className="step-number">{stage > i ? <Check size={17} /> : `0${i + 1}`}</span><span><strong>{s.title}</strong><small>{s.detail}</small></span>{i < 2 && <ArrowRight size={16} className="step-arrow" />}</button>)}</nav>
     {error && <div className="plan-alert error" role="alert"><AlertTriangle size={18} /><div>{error}</div><button aria-label="Dismiss error" onClick={() => setError("")}><X size={16} /></button></div>}
     <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/tiff,image/avif" aria-label="Upload floor plan image" className="sr-only" onChange={e => { const file = e.target.files?.[0]; e.currentTarget.value = ""; if (file) void analyze(file); }} />
@@ -214,7 +250,32 @@ export default function NewMapPage() {
         {candidatePanel}
         {stage === 2 && <section className="plan-card plan-pad plan-save-panel"><h3>Name & save your map</h3><label htmlFor="map-title">Map name</label><input id="map-title" value={title} maxLength={255} onChange={e => setTitle(e.target.value)} placeholder="Science building, ground floor" /><label htmlFor="map-description">Description <span>(optional)</span></label><textarea id="map-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Building, level and important notes" /><label className="plan-checkbox review-checkbox"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /><span>I checked the walls, doorways, exterior areas and actual exit positions against the source plan.</span></label><div className="plan-save-checks"><span className={allRouted ? "done" : ""}><Check size={14} />Routes validated on this grid</span><span className={reviewed ? "done" : ""}><Check size={14} />Source review confirmed</span></div><button className="plan-btn primary full" disabled={!!busy} onClick={() => save(true)}>{busy === "save" ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}Save & run A*</button><button className="plan-btn secondary full" disabled={!!busy} onClick={() => save(false)}>Save draft</button><p className="plan-small">Your source image, conversion settings, edits and computed result are saved together. Drafts can be refined later.</p></section>}
       </aside></div>
-      <div className="plan-bottom-bar"><button className="plan-btn secondary" onClick={() => setStage(stage - 1)} disabled={!!busy}><ArrowLeft size={16} />{stage === 1 ? "Upload" : "Review conversion"}</button>{stage === 1 ? <button className="plan-btn primary" disabled={!!busy || settingsDirty} onClick={() => setStage(2)}>Refine grid & confirm exits <ArrowRight size={17} /></button> : <span className="plan-small">{doc.starts.length} people · {doc.exits.length} confirmed exits · {doc.obstacles.length} simulated fire cells</span>}</div>
+      <div className="plan-bottom-bar">
+        <button className="plan-btn secondary" onClick={() => setStage(stage - 1)} disabled={!!busy}>
+          <ArrowLeft size={16} />{stage === 1 ? "Upload" : "Review conversion"}
+        </button>
+        {stage === 1 ? (
+          <div className="flex items-center gap-3">
+            <button className="plan-btn primary" disabled={busy === "save" || busy === "analyze"} onClick={() => save(true)}>
+              {busy === "save" ? <Loader2 size={16} className="animate-spin mr-1" /> : <Route size={16} className="mr-1" />}
+              Save & Run A* Now
+            </button>
+            <button className="plan-btn secondary" disabled={busy === "convert"} onClick={proceedToRefine}>
+              Refine grid & confirm exits <ArrowRight size={17} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <button className="plan-btn primary" disabled={busy === "save"} onClick={() => save(true)}>
+              {busy === "save" ? <Loader2 className="animate-spin mr-1" size={17} /> : <Route size={17} className="mr-1" />}
+              Save & Run A* Now <ArrowRight size={17} />
+            </button>
+            <button className="plan-btn secondary" disabled={busy === "save"} onClick={() => save(false)}>
+              <Save size={15} /> Save draft
+            </button>
+          </div>
+        )}
+      </div>
     </>}
     <footer className="plan-safety-note"><ShieldCheck size={17} /><p><strong>For learning and planning, not emergency navigation.</strong> Image analysis cannot verify real building conditions or certify an evacuation route. In an emergency, follow posted signs, staff instructions and local emergency guidance.</p></footer>
   </div></DashboardLayout>;

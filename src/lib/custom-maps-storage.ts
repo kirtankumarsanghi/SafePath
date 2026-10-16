@@ -31,15 +31,15 @@ export function getCustomMaps(): StoredCustomMap[] {
   }
 }
 
-export function getCustomMapById(id: number): StoredCustomMap | null {
+export function getCustomMapById(id: number | string): StoredCustomMap | null {
   const maps = getCustomMaps();
-  return maps.find(m => m.id === id) ?? null;
+  return maps.find(m => m.id === Number(id) || String(m.id) === String(id)) ?? null;
 }
 
 export function saveCustomMap(map: SavedMap): StoredCustomMap {
   const storage = safeGetStorage();
   const maps = getCustomMaps();
-  const index = maps.findIndex(m => m.id === map.id);
+  const index = maps.findIndex(m => m.id === map.id || String(m.id) === String(map.id));
 
   const entry: StoredCustomMap = {
     ...map,
@@ -80,9 +80,9 @@ export function saveCustomMap(map: SavedMap): StoredCustomMap {
   return entry;
 }
 
-export function deleteCustomMap(id: number): void {
+export function deleteCustomMap(id: number | string): void {
   const storage = safeGetStorage();
-  const maps = getCustomMaps().filter(m => m.id !== id);
+  const maps = getCustomMaps().filter(m => m.id !== Number(id) && String(m.id) !== String(id));
   if (storage) {
     try {
       storage.setItem(STORAGE_KEY, JSON.stringify(maps));
@@ -116,13 +116,17 @@ export function ensureValidCoordinates(doc: GridDocument): { doc: GridDocument; 
   let { starts, exits, gridData, gridWidth, gridHeight, obstacles } = doc;
   let added = false;
 
-  const blockedObstacles = new Set(obstacles.map(p => `${p.x},${p.y}`));
+  const blockedObstacles = new Set((obstacles ?? []).map(p => `${p.x},${p.y}`));
   const isFree = (x: number, y: number) => {
     const k = `${x},${y}`;
-    const cell = gridData[k];
+    const cell = gridData?.[k];
     return x >= 0 && y >= 0 && x < gridWidth && y < gridHeight &&
       cell !== "wall" && cell !== "blocked" && cell !== "fire" && !blockedObstacles.has(k);
   };
+
+  // Only keep starts and exits that are currently on free, walkable cells
+  let nextExits = (Array.isArray(exits) ? exits : []).filter(p => isFree(p.x, p.y));
+  let nextStarts = (Array.isArray(starts) ? starts : []).filter(p => isFree(p.x, p.y));
 
   // Find all free walkable coordinates
   const freeCells: Point[] = [];
@@ -132,16 +136,21 @@ export function ensureValidCoordinates(doc: GridDocument): { doc: GridDocument; 
     }
   }
 
-  let nextExits = [...exits];
+  if (freeCells.length === 0) {
+    for (let y = 0; y < gridHeight; y++) {
+      for (let x = 0; x < gridWidth; x++) {
+        if (isFree(x, y)) freeCells.push({ x, y });
+      }
+    }
+  }
+
   if (nextExits.length === 0 && freeCells.length > 0) {
-    // Pick a cell near perimeter if possible, or any free cell
     const perimeterExit = freeCells.find(p => p.x <= 2 || p.x >= gridWidth - 3 || p.y <= 2 || p.y >= gridHeight - 3) || freeCells[freeCells.length - 1];
     nextExits.push(perimeterExit);
     added = true;
   }
 
-  let nextStarts = [...starts];
-  if (nextStarts.length === 0 && freeCells.length > 1) {
+  if (nextStarts.length === 0 && freeCells.length > 0) {
     const exitKey = nextExits[0] ? `${nextExits[0].x},${nextExits[0].y}` : "";
     const startCandidate = freeCells.find(p => `${p.x},${p.y}` !== exitKey) || freeCells[0];
     if (startCandidate) {

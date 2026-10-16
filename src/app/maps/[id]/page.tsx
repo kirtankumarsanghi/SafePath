@@ -19,8 +19,16 @@ export default function MapEditPage() {
 
   useEffect(() => {
     const abort = new AbortController();
-    const numId = Number(id);
-    const localMap = getCustomMapById(numId);
+    const localMap = getCustomMapById(id);
+
+    if (localMap) {
+      setMap(localMap);
+      setDoc({ ...localMap, gridData: cleanTerrain(localMap.gridData) });
+      setTitle(localMap.title);
+      setDescription(localMap.description ?? "");
+      setReviewed(!localMap.imageUrl || !!localMap.analysis?.reviewed);
+      setLoading(false);
+    }
 
     fetch(`/api/maps/${id}`, { signal: abort.signal })
       .then(async r => {
@@ -39,13 +47,7 @@ export default function MapEditPage() {
       })
       .catch(e => {
         if (!abort.signal.aborted) {
-          if (localMap) {
-            setMap(localMap);
-            setDoc({ ...localMap, gridData: cleanTerrain(localMap.gridData) });
-            setTitle(localMap.title);
-            setDescription(localMap.description ?? "");
-            setReviewed(!localMap.imageUrl || !!localMap.analysis?.reviewed);
-          } else {
+          if (!localMap) {
             setError(e.message);
           }
         }

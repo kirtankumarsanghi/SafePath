@@ -61,7 +61,26 @@ function Simulator() {
       setLoading(false);
       return () => abort.abort();
     }
-    const numId = Number(requestedId);
+    const local = getCustomMapById(requestedId);
+    if (local) {
+      setMap(local);
+      const rawDoc: GridDocument = {
+        gridWidth: local.gridWidth,
+        gridHeight: local.gridHeight,
+        gridData: cleanTerrain(local.gridData),
+        starts: Array.isArray(local.starts) ? local.starts : [],
+        exits: Array.isArray(local.exits) ? local.exits : [],
+        obstacles: Array.isArray(local.obstacles) ? local.obstacles : [],
+      };
+      const { doc: readyDoc } = ensureValidCoordinates(rawDoc);
+      setDoc(readyDoc);
+      setView(local.imageUrl ? "overlay" : "grid");
+      setHeuristic("manhattan");
+      setDiagonal(false);
+      setEnabled(true);
+      setLoading(false);
+      return () => abort.abort();
+    }
 
     fetch(`/api/maps/${requestedId}`, { signal: abort.signal })
       .then(async response => {
@@ -72,8 +91,6 @@ function Simulator() {
         throw new Error("Server lookup failed");
       })
       .catch(() => {
-        const local = getCustomMapById(numId);
-        if (local) return local;
         throw new Error("Could not load this floor plan.");
       })
       .then(loaded => {

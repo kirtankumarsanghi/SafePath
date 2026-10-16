@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const mapId = body.mapId === null || body.mapId === undefined ? null : Number(body.mapId);
-    if (mapId !== null && (!Number.isInteger(mapId) || mapId <= 0 || mapId > 2147483647)) throw new MapInputError("Invalid map ID.");
+    if (mapId !== null && (!Number.isInteger(mapId) || mapId <= 0)) throw new MapInputError("Invalid map ID.");
 
     let map = null;
     let validMapId: number | null = mapId;

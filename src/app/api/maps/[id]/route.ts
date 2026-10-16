@@ -8,7 +8,7 @@ import { runRecord } from "@/lib/run-storage";
 import { SAMPLE_MAPS } from "@/lib/sample-data";
 
 type Context = { params: Promise<{ id: string }> };
-const validId = (id: string) => /^\d+$/.test(id) && Number(id) > 0 && Number(id) < 2147483647;
+const validId = (id: string) => /^\d+$/.test(id) && Number(id) > 0;
 
 function publicMap(map: typeof floorMaps.$inferSelect | any) {
   return { ...map, imageUrl: map.imageUrl ? `/api/maps/${map.id}/image?kind=working` : null, sourceImage: map.sourceImage ? `/api/maps/${map.id}/image?kind=source` : null };
