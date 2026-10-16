@@ -12,7 +12,16 @@ export interface RunSummary {
 }
 export async function getJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
-  const data = await response.json().catch(() => ({ error: "The server returned an unreadable response. Please try again." }));
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    const errorMsg =
+      response.status === 500 || response.status === 504
+        ? `Server error (${response.status}). If deployed on Vercel, please check that DATABASE_URL is configured in your Vercel Project Settings.`
+        : `The server returned an unreadable response (${response.status}). Please try again.`;
+    data = { error: errorMsg };
+  }
   if (!response.ok) throw new Error(data.error || "The request could not be completed.");
   return data as T;
 }

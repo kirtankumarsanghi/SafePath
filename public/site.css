@@ -261,24 +261,33 @@ html.light .site-footer a:hover {
 [data-theme="light"] .site-button,
 html.light .site-button {
   background: #ffffff;
-  border-color: #d0d5dd;
-  color: #111215;
+  border-color: #cbd5e1;
+  color: #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 [data-theme="light"] .site-button:hover:not(:disabled),
 html.light .site-button:hover:not(:disabled) {
-  background: #f1f3f5;
-  border-color: #bcc3cd;
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 [data-theme="light"] .site-button.primary,
 html.light .site-button.primary {
-  background: #111215;
+  background: #059669;
   color: #ffffff;
-  border-color: #111215;
+  border-color: #047857;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.22);
 }
 [data-theme="light"] .site-button.primary:hover:not(:disabled),
 html.light .site-button.primary:hover:not(:disabled) {
-  background: #25282e;
-  border-color: #25282e;
+  background: #047857;
+  border-color: #065f46;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.32);
+}
+[data-theme="light"] .site-menu__panel .site-menu__action,
+html.light .site-menu__panel .site-menu__action {
+  color: #ffffff;
+  background: #059669;
 }
 
 @media(max-width:1040px) { .site-nav, .site-header__inner > .site-account { display: none; } .site-menu-button { display: block; } }

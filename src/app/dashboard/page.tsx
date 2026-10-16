@@ -12,6 +12,20 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [dbStatus, setDbStatus] = useState<"CONNECTED" | "DEMO MODE">("CONNECTED");
+
+  useEffect(() => {
+    fetch("/api/health")
+      .then(r => r.json())
+      .then(d => {
+        if (d.mode === "demo" || d.database === "unconfigured") {
+          setDbStatus("DEMO MODE");
+        } else if (d.ok) {
+          setDbStatus("CONNECTED");
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -64,6 +78,14 @@ export default function DashboardPage() {
             <a className="site-button primary" href="/maps/new">Upload floor plan</a>
           </div>
         </header>
+
+        {dbStatus === "DEMO MODE" && !error && (
+          <div className="p-3 bg-emerald-950/40 border border-emerald-500/30 rounded-lg text-xs text-emerald-200/90 flex items-center justify-between">
+            <span>
+              ℹ️ <strong>Deployment Preview Active:</strong> Serving bundled blueprints and benchmark runs. To persist custom uploads in production, configure <code>DATABASE_URL</code> in Vercel Project Settings.
+            </span>
+          </div>
+        )}
 
         {error && (
           <div className="workspace-alert" role="alert">
@@ -216,13 +238,19 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex justify-between items-center text-slate-300">
                     <span>PostgreSQL DB</span>
-                    <span className="text-emerald-400">CONNECTED</span>
+                    <span className={dbStatus === "CONNECTED" ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
+                      {dbStatus}
+                    </span>
                   </div>
                 </div>
 
                 <div className="space-y-1 text-slate-500 leading-relaxed">
-                  <div>[10:42:01] DB connected successfully.</div>
-                  <div>[10:42:03] Cache traced to memory.</div>
+                  <div>
+                    {dbStatus === "CONNECTED"
+                      ? "[10:42:01] DB connected successfully."
+                      : "[10:42:01] Running in cloud demo mode with sample plans."}
+                  </div>
+                  <div>[10:42:03] A* routing engine initialized.</div>
                   <div>[10:42:05] Ready to compile new structural plans.</div>
                 </div>
               </div>

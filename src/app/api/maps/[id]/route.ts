@@ -1,26 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDatabaseReady, isDatabaseConfigured } from "@/db";
 import { floorMaps, runs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { MapInputError, parseMapInput, inspectDocument } from "@/lib/map-model";
 import { runEvacuation } from "@/lib/astar";
 import { runRecord } from "@/lib/run-storage";
+import { SAMPLE_MAPS } from "@/lib/sample-data";
+
 type Context = { params: Promise<{ id: string }> };
 const validId = (id: string) => /^\d+$/.test(id) && Number(id) > 0 && Number(id) < 2147483647;
-function publicMap(map: typeof floorMaps.$inferSelect) {
+
+function publicMap(map: typeof floorMaps.$inferSelect | any) {
   return { ...map, imageUrl: map.imageUrl ? `/api/maps/${map.id}/image?kind=working` : null, sourceImage: map.sourceImage ? `/api/maps/${map.id}/image?kind=source` : null };
 }
+
 export async function GET(_req: NextRequest, { params }: Context) {
   const { id } = await params;
   if (!validId(id)) return NextResponse.json({ error: "Invalid map ID." }, { status: 400 });
+  const numId = Number(id);
+
   try {
-    const [map] = await db.select().from(floorMaps).where(eq(floorMaps.id, Number(id)));
-    return map ? NextResponse.json({ map: publicMap(map) }) : NextResponse.json({ error: "Map not found." }, { status: 404 });
-  } catch (error) { console.error(error); return NextResponse.json({ error: "The map could not be loaded." }, { status: 500 }); }
+    if (isDatabaseConfigured) {
+      await ensureDatabaseReady();
+      const [map] = await db.select().from(floorMaps).where(eq(floorMaps.id, numId));
+      if (map) return NextResponse.json({ map: publicMap(map) });
+    }
+  } catch (error) {
+    console.warn("DB lookup failed, checking sample plans:", error);
+  }
+
+  const sample = SAMPLE_MAPS.find(m => m.id === numId);
+  if (sample) return NextResponse.json({ map: publicMap(sample) });
+
+  return NextResponse.json({ error: "Map not found." }, { status: 404 });
 }
+
 export async function PUT(req: NextRequest, { params }: Context) {
   const { id } = await params;
   if (!validId(id)) return NextResponse.json({ error: "Invalid map ID." }, { status: 400 });
+  if (!isDatabaseConfigured) {
+    return NextResponse.json({ error: "PostgreSQL database is not configured. Please set DATABASE_URL in Vercel Project Settings to save plan edits." }, { status: 503 });
+  }
+  await ensureDatabaseReady();
   try {
     const [existing] = await db.select().from(floorMaps).where(eq(floorMaps.id, Number(id)));
     if (!existing) return NextResponse.json({ error: "Map not found." }, { status: 404 });

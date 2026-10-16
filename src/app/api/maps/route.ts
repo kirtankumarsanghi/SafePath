@@ -1,22 +1,58 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDatabaseReady, isDatabaseConfigured } from "@/db";
 import { floorMaps, runs } from "@/db/schema";
 import { desc, sql } from "drizzle-orm";
 import { MapInputError, inspectDocument, parseMapInput } from "@/lib/map-model";
 import { runEvacuation } from "@/lib/astar";
 import { runRecord } from "@/lib/run-storage";
 import { verifyToken } from "@/lib/auth";
+import { SAMPLE_MAPS } from "@/lib/sample-data";
+
 function publicMap(map: typeof floorMaps.$inferSelect) {
   return { ...map, imageUrl: map.imageUrl ? `/api/maps/${map.id}/image?kind=working` : null, sourceImage: map.sourceImage ? `/api/maps/${map.id}/image?kind=source` : null };
 }
+
 export async function GET() {
   try {
-    const maps = await db.select({ id: floorMaps.id, title: floorMaps.title, description: floorMaps.description, gridWidth: floorMaps.gridWidth, gridHeight: floorMaps.gridHeight, exits: floorMaps.exits, starts: floorMaps.starts, obstacles: floorMaps.obstacles, updatedAt: floorMaps.updatedAt, createdAt: floorMaps.createdAt, hasImage: sql<boolean>`${floorMaps.imageUrl} is not null`, hasSource: sql<boolean>`${floorMaps.sourceImage} is not null` }).from(floorMaps).orderBy(desc(floorMaps.updatedAt)).limit(100);
-    return NextResponse.json({ maps: maps.map(m => ({ ...m, imageUrl: m.hasImage ? `/api/maps/${m.id}/image?kind=working` : null, sourceImage: m.hasSource ? `/api/maps/${m.id}/image?kind=source` : null })) });
-  } catch (error) { console.error("List maps failed", error); return NextResponse.json({ error: "Maps could not be loaded. Please try again." }, { status: 500 }); }
+    if (isDatabaseConfigured) {
+      await ensureDatabaseReady();
+      const maps = await db.select({ id: floorMaps.id, title: floorMaps.title, description: floorMaps.description, gridWidth: floorMaps.gridWidth, gridHeight: floorMaps.gridHeight, exits: floorMaps.exits, starts: floorMaps.starts, obstacles: floorMaps.obstacles, updatedAt: floorMaps.updatedAt, createdAt: floorMaps.createdAt, hasImage: sql<boolean>`${floorMaps.imageUrl} is not null`, hasSource: sql<boolean>`${floorMaps.sourceImage} is not null` }).from(floorMaps).orderBy(desc(floorMaps.updatedAt)).limit(100);
+      if (maps.length > 0) {
+        return NextResponse.json({ maps: maps.map(m => ({ ...m, imageUrl: m.hasImage ? `/api/maps/${m.id}/image?kind=working` : null, sourceImage: m.hasSource ? `/api/maps/${m.id}/image?kind=source` : null })) });
+      }
+    }
+  } catch (error) {
+    console.warn("List maps failed, using sample plans fallback:", error);
+  }
+
+  return NextResponse.json({
+    maps: SAMPLE_MAPS.map(m => ({
+      id: m.id,
+      title: m.title,
+      description: m.description,
+      gridWidth: m.gridWidth,
+      gridHeight: m.gridHeight,
+      exits: m.exits,
+      starts: m.starts,
+      obstacles: m.obstacles,
+      updatedAt: m.updatedAt,
+      createdAt: m.createdAt,
+      imageUrl: `/api/maps/${m.id}/preview?v=${encodeURIComponent(m.updatedAt)}`,
+      sourceImage: null,
+      analysis: m.analysis,
+    })),
+  });
 }
+
 export async function POST(req: NextRequest) {
   try {
+    if (!isDatabaseConfigured) {
+      return NextResponse.json(
+        { error: "PostgreSQL database is not configured. Please set DATABASE_URL in Vercel Project Settings to persist plans." },
+        { status: 503 }
+      );
+    }
+    await ensureDatabaseReady();
     if (Number(req.headers.get("content-length") ?? 0) > 23_000_000) return NextResponse.json({ error: "The reviewed map and original image exceed the 23 MB storage limit. Use a smaller source image." }, { status: 413 });
     const body = await req.json();
     const input = parseMapInput(body);

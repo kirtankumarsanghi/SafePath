@@ -1,17 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { db, ensureDatabaseReady, isDatabaseConfigured } from "@/db";
 import { runs, floorMaps } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { MapInputError, parseMapInput, inspectDocument } from "@/lib/map-model";
 import { runEvacuation, type HeuristicType } from "@/lib/astar";
 import { runRecord } from "@/lib/run-storage";
 import { verifyToken } from "@/lib/auth";
+import { SAMPLE_RUNS } from "@/lib/sample-data";
+
 export async function GET() {
-  try { return NextResponse.json({ runs: await db.select().from(runs).orderBy(desc(runs.createdAt)).limit(50) }); }
-  catch (error) { console.error(error); return NextResponse.json({ error: "Run history could not be loaded." }, { status: 500 }); }
+  try {
+    if (isDatabaseConfigured) {
+      await ensureDatabaseReady();
+      const dbRuns = await db.select().from(runs).orderBy(desc(runs.createdAt)).limit(50);
+      if (dbRuns.length > 0) {
+        return NextResponse.json({ runs: dbRuns });
+      }
+    }
+  } catch (error) {
+    console.warn("Runs query failed, using sample runs fallback:", error);
+  }
+
+  return NextResponse.json({ runs: SAMPLE_RUNS });
 }
+
 export async function POST(req: NextRequest) {
   try {
+    if (!isDatabaseConfigured) {
+      return NextResponse.json(
+        { error: "PostgreSQL database is not configured. Please set DATABASE_URL in Vercel Project Settings to persist runs." },
+        { status: 503 }
+      );
+    }
+    await ensureDatabaseReady();
     const body = await req.json();
     const mapId = body.mapId === null || body.mapId === undefined ? null : Number(body.mapId);
     if (mapId !== null && (!Number.isInteger(mapId) || mapId <= 0 || mapId > 2147483647)) throw new MapInputError("Invalid map ID.");
