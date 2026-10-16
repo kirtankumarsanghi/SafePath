@@ -9,8 +9,10 @@ export interface SavedMap extends GridDocument {
   analysis: SavedAnalysis | null; updatedAt?: string;
 }
 export type EditTool = "person" | "exit" | "wall" | "fire" | "floor" | "blocked" | "erase";
-export function cleanTerrain(grid: Record<string, CellType>): Record<string, CellType> {
-  return Object.fromEntries(Object.entries(grid).map(([k, v]) => [k, v === "start" || v === "exit" ? "empty" : v]));
+export function cleanTerrain(grid: Record<string, CellType> | string | undefined | null): Record<string, CellType> {
+  if (!grid) return {};
+  const g = typeof grid === "string" ? (() => { try { return JSON.parse(grid); } catch { return {}; } })() : grid;
+  return Object.fromEntries(Object.entries(g).map(([k, v]) => [k, v === "start" || v === "exit" ? "empty" : v as CellType]));
 }
 export function applyTool(doc: GridDocument, tool: EditTool, p: Point): GridDocument {
   if (p.x < 0 || p.y < 0 || p.x >= doc.gridWidth || p.y >= doc.gridHeight) return doc;
@@ -66,15 +68,24 @@ export function parseMapInput(value: unknown) {
   if (!title || title.length > 255) fail("A map title of 1–255 characters is required.");
   const width = b.gridWidth as number, height = b.gridHeight as number;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 8 || height < 8 || width > 96 || height > 96) fail("Grid dimensions must be integers from 8 to 96.");
-  if (!b.gridData || typeof b.gridData !== "object" || Array.isArray(b.gridData)) fail("The converted grid is missing. Analyze or create a map first.");
-  const input = b.gridData as Record<string, unknown>, gridData: Record<string, CellType> = {};
+  
+  let rawGrid = b.gridData;
+  if (typeof rawGrid === "string") {
+    try { rawGrid = JSON.parse(rawGrid); } catch {}
+  }
+  if (!rawGrid || typeof rawGrid !== "object" || Array.isArray(rawGrid)) fail("The converted grid is missing. Analyze or create a map first.");
+  const input = rawGrid as Record<string, unknown>, gridData: Record<string, CellType> = {};
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const k = `${x},${y}`, type = input[k];
     if (typeof type !== "string" || !TYPES.has(type)) fail(`Grid cell (${x}, ${y}) is missing or invalid. Re-convert the image.`);
     gridData[k] = type === "start" || type === "exit" ? "empty" : type as CellType;
   }
   const points = (field: string, max: number): Point[] => {
-    const data = b[field]; if (!Array.isArray(data) || data.length > max) fail(`${field} must be an array with at most ${max} cells.`);
+    let data = b[field];
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch { data = []; }
+    }
+    if (!Array.isArray(data) || data.length > max) fail(`${field} must be an array with at most ${max} cells.`);
     const seen = new Set<string>(); const result: Point[] = [];
     for (const point of data as unknown[]) {
       if (!point || typeof point !== "object") fail(`Invalid ${field} coordinate.`);
@@ -86,17 +97,21 @@ export function parseMapInput(value: unknown) {
   };
   const starts = points("starts", 12), exits = points("exits", 32), obstacles = points("obstacles", width * height);
   const dataImage = (field: string, maxLength: number, types: string): string | null => {
-    const value = b[field];
-    if (value == null) return null;
-    if (typeof value !== "string" || value.length > maxLength) fail(`${field} is invalid or too large. Re-upload the original image.`);
+    const rawVal = b[field];
+    if (rawVal == null) return null;
+    if (typeof rawVal !== "string") {
+      fail(`${field} is invalid. Re-upload the original image.`);
+    }
+    const value = (rawVal as string).trim();
+    if (value.length > maxLength) fail(`${field} is too large. Re-upload a smaller image.`);
     // Maps loaded from the API carry the served image endpoint rather than the
     // base64 payload, so both forms are valid input.
-    if (/^\/api\/maps\/\d+\/image(?:\?kind=(?:working|source))?$/.test(value as string)) return null;
-    if (!new RegExp(`^data:image/(?:${types});base64,[a-zA-Z0-9+/=]+$`).test(value as string)) fail(`${field} is invalid or too large. Re-upload the original image.`);
-    return value as string;
+    if (/^\/api\/maps\/\d+\/(?:image|preview)(?:\?.*)?$/.test(value)) return null;
+    if (value.startsWith("data:image/")) return value;
+    return null;
   };
   // `null` here means "keep whatever the server already stores".
-  const imageUrl = dataImage("imageUrl", 6_000_000, "webp|png|jpeg"), sourceImage = dataImage("sourceImage", 16_900_000, "png|jpeg|webp|gif|tiff|avif|heif");
+  const imageUrl = dataImage("imageUrl", 8_000_000, "webp|png|jpeg|jpg|gif|avif|tiff"), sourceImage = dataImage("sourceImage", 16_900_000, "png|jpeg|webp|gif|tiff|avif|heif");
   const analysis = b.analysis as SavedAnalysis | null | undefined;
   if (analysis) {
     if (analysis.version !== 2 || !analysis.options || !Array.isArray(analysis.labels) || analysis.labels.length > 1000 || !Array.isArray(analysis.candidates) || analysis.candidates.length > 100 || typeof analysis.reviewed !== "boolean") fail("Invalid analysis metadata.");

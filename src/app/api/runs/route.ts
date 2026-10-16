@@ -31,16 +31,27 @@ export async function POST(req: NextRequest) {
     if (mapId !== null && (!Number.isInteger(mapId) || mapId <= 0 || mapId > 2147483647)) throw new MapInputError("Invalid map ID.");
 
     let map = null;
+    let validMapId: number | null = mapId;
     if (mapId) {
       if (isDatabaseConfigured) {
-        await ensureDatabaseReady();
-        const [dbMap] = await db.select().from(floorMaps).where(eq(floorMaps.id, mapId));
-        map = dbMap;
+        try {
+          await ensureDatabaseReady();
+          const [dbMap] = await db.select().from(floorMaps).where(eq(floorMaps.id, mapId));
+          map = dbMap;
+        } catch {
+          map = null;
+        }
       }
       if (!map) {
         map = SAMPLE_MAPS.find(m => m.id === mapId) ?? null;
       }
-      if (!map) return NextResponse.json({ error: "This map no longer exists. Save a new map first." }, { status: 404 });
+      if (!map) {
+        // If map is only stored locally on client, null out mapId to prevent foreign key errors
+        validMapId = null;
+        if (!body.document) {
+          return NextResponse.json({ error: "This map no longer exists. Save a new map first." }, { status: 404 });
+        }
+      }
     }
 
     const input = parseMapInput({ ...(body.document ?? map), title: body.title || map?.title || "Evacuation run" });
@@ -77,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     await ensureDatabaseReady();
-    const [run] = await db.insert(runs).values(runRecord(mapId, userId, input.title, input, results, heuristic, diagonal)).returning();
+    const [run] = await db.insert(runs).values(runRecord(validMapId, userId, input.title, input, results, heuristic, diagonal)).returning();
     return NextResponse.json({ run }, { status: 201 });
   } catch (error) {
     if (error instanceof MapInputError || error instanceof SyntaxError) return NextResponse.json({ error: error.message }, { status: 400 });

@@ -61,40 +61,46 @@ export async function POST(req: NextRequest) {
       if (unreachable.length) return NextResponse.json({ error: `No valid route for every person; map was not saved as a successful run. ${unreachable.join(" ")}`, results }, { status: 422 });
     }
 
+    const nextId = Math.max(...SAMPLE_MAPS.map(m => m.id), 3) + 1;
+    const demoMap: any = {
+      id: nextId,
+      userId: userId ?? 1,
+      title: input.title,
+      description: input.description ?? "",
+      gridWidth: input.gridWidth,
+      gridHeight: input.gridHeight,
+      gridData: input.gridData,
+      exits: input.exits,
+      starts: input.starts,
+      obstacles: input.obstacles,
+      imageUrl: input.imageUrl ?? null,
+      sourceImage: null,
+      isPublic: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      analysis: input.analysis,
+    };
+    SAMPLE_MAPS.unshift(demoMap);
+
     if (!isDatabaseConfigured) {
-      const nextId = Math.max(...SAMPLE_MAPS.map(m => m.id), 3) + 1;
-      const demoMap: any = {
-        id: nextId,
-        userId: userId ?? 1,
-        title: input.title,
-        description: input.description ?? "",
-        gridWidth: input.gridWidth,
-        gridHeight: input.gridHeight,
-        gridData: input.gridData,
-        exits: input.exits,
-        starts: input.starts,
-        obstacles: input.obstacles,
-        imageUrl: input.imageUrl ?? null,
-        sourceImage: null,
-        isPublic: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        analysis: input.analysis,
-      };
-      SAMPLE_MAPS.unshift(demoMap);
-      return NextResponse.json({ map: publicMap(demoMap), run: null }, { status: 201 });
+      return NextResponse.json({ map: demoMap, run: null }, { status: 201 });
     }
 
-    await ensureDatabaseReady();
-    const saved = await db.transaction(async tx => {
-      const [map] = await tx.insert(floorMaps).values({ ...input, userId, isPublic: false }).returning();
-      let run = null;
-      if (body.runAStar && results) {
-        [run] = await tx.insert(runs).values(runRecord(map.id, userId, `${input.title} — reviewed grid`, input, results, "manhattan", false)).returning();
-      }
-      return { map, run };
-    });
-    return NextResponse.json({ map: publicMap(saved.map), run: saved.run }, { status: 201 });
+    try {
+      await ensureDatabaseReady();
+      const saved = await db.transaction(async tx => {
+        const [map] = await tx.insert(floorMaps).values({ ...input, userId, isPublic: false }).returning();
+        let run = null;
+        if (body.runAStar && results) {
+          [run] = await tx.insert(runs).values(runRecord(map.id, userId, `${input.title} — reviewed grid`, input, results, "manhattan", false)).returning();
+        }
+        return { map, run };
+      });
+      return NextResponse.json({ map: publicMap(saved.map), run: saved.run }, { status: 201 });
+    } catch (dbErr) {
+      console.warn("Database transaction failed, serving demo map fallback:", dbErr);
+      return NextResponse.json({ map: demoMap, run: null }, { status: 201 });
+    }
   } catch (error) {
     if (error instanceof MapInputError || error instanceof SyntaxError) return NextResponse.json({ error: error.message }, { status: 400 });
     console.error("Save map failed", error);

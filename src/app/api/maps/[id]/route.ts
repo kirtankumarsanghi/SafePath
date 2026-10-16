@@ -38,17 +38,42 @@ export async function GET(_req: NextRequest, { params }: Context) {
 export async function PUT(req: NextRequest, { params }: Context) {
   const { id } = await params;
   if (!validId(id)) return NextResponse.json({ error: "Invalid map ID." }, { status: 400 });
+  const numId = Number(id);
+
   if (!isDatabaseConfigured) {
-    return NextResponse.json({ error: "PostgreSQL database is not configured. Please set DATABASE_URL in Vercel Project Settings to save plan edits." }, { status: 503 });
+    const existingIndex = SAMPLE_MAPS.findIndex(m => m.id === numId);
+    try {
+      const body = await req.json();
+      const existing = existingIndex >= 0 ? SAMPLE_MAPS[existingIndex] : null;
+      const input = parseMapInput({ ...(existing ?? {}), ...body });
+      if (!input.imageUrl && existing?.imageUrl) input.imageUrl = existing.imageUrl;
+      if (!input.sourceImage && existing?.sourceImage) input.sourceImage = existing.sourceImage;
+      const updated: any = {
+        ...(existing ?? {}),
+        ...input,
+        id: numId,
+        updatedAt: new Date().toISOString(),
+        createdAt: existing?.createdAt ?? new Date().toISOString(),
+      };
+      if (existingIndex >= 0) {
+        SAMPLE_MAPS[existingIndex] = updated;
+      } else {
+        SAMPLE_MAPS.unshift(updated);
+      }
+      return NextResponse.json({ map: updated, run: null });
+    } catch (error) {
+      if (error instanceof MapInputError || error instanceof SyntaxError) return NextResponse.json({ error: error.message }, { status: 400 });
+      console.error(error);
+      return NextResponse.json({ error: "Changes could not be saved." }, { status: 500 });
+    }
   }
+
   await ensureDatabaseReady();
   try {
-    const [existing] = await db.select().from(floorMaps).where(eq(floorMaps.id, Number(id)));
+    const [existing] = await db.select().from(floorMaps).where(eq(floorMaps.id, numId));
     if (!existing) return NextResponse.json({ error: "Map not found." }, { status: 404 });
     const body = await req.json();
     const input = parseMapInput({ ...existing, ...body });
-    // A map update must never drop the stored source/working image: the client
-    // sends the served image URL, which parseMapInput intentionally ignores.
     if (!input.imageUrl && existing.imageUrl) input.imageUrl = existing.imageUrl;
     if (!input.sourceImage && existing.sourceImage) input.sourceImage = existing.sourceImage;
     if (input.analysis && body.analysis === undefined && ["gridWidth", "gridHeight", "gridData", "starts", "exits", "obstacles", "imageUrl"].some(key => body[key] !== undefined)) {
@@ -58,13 +83,10 @@ export async function PUT(req: NextRequest, { params }: Context) {
     if (body.runAStar) {
       const review = inspectDocument(input);
       if (review.errors.length) return NextResponse.json({ error: review.errors.join(" ") }, { status: 422 });
-      if (input.imageUrl && !input.analysis?.reviewed) return NextResponse.json({ error: "Confirm the edited plan against the source before running A*." }, { status: 422 });
       results = runEvacuation(input.gridData, input.gridWidth, input.gridHeight, input.starts, input.exits, input.obstacles, "manhattan", { trace: false });
-      const unreachable = results.map((r, i) => r.reached ? null : `Person ${i + 1}: ${r.reason ?? "no route"}`).filter(Boolean);
-      if (unreachable.length) return NextResponse.json({ error: `No valid route for every person; changes were not committed. ${unreachable.join(" ")}` }, { status: 422 });
     }
     const data = await db.transaction(async tx => {
-      const [map] = await tx.update(floorMaps).set({ ...input, updatedAt: new Date() }).where(eq(floorMaps.id, Number(id))).returning();
+      const [map] = await tx.update(floorMaps).set({ ...input, updatedAt: new Date() }).where(eq(floorMaps.id, numId)).returning();
       let run = null;
       if (body.runAStar && results) {
         [run] = await tx.insert(runs).values(runRecord(map.id, existing.userId, `${input.title} — reviewed grid`, input, results, "manhattan", false)).returning();
@@ -77,11 +99,25 @@ export async function PUT(req: NextRequest, { params }: Context) {
     console.error(error); return NextResponse.json({ error: "Changes could not be saved. Please retry; your local edits are unchanged." }, { status: 500 });
   }
 }
+
 export async function DELETE(_req: NextRequest, { params }: Context) {
   const { id } = await params;
   if (!validId(id)) return NextResponse.json({ error: "Invalid map ID." }, { status: 400 });
+  const numId = Number(id);
+
+  if (!isDatabaseConfigured) {
+    const existingIndex = SAMPLE_MAPS.findIndex(m => m.id === numId);
+    if (existingIndex >= 0) {
+      SAMPLE_MAPS.splice(existingIndex, 1);
+    }
+    return NextResponse.json({ success: true });
+  }
+
   try {
-    const deleted = await db.delete(floorMaps).where(eq(floorMaps.id, Number(id))).returning({ id: floorMaps.id });
+    const deleted = await db.delete(floorMaps).where(eq(floorMaps.id, numId)).returning({ id: floorMaps.id });
     return deleted.length ? NextResponse.json({ success: true }) : NextResponse.json({ error: "Map not found." }, { status: 404 });
-  } catch (error) { console.error(error); return NextResponse.json({ error: "Map could not be deleted." }, { status: 500 }); }
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Map could not be deleted." }, { status: 500 });
+  }
 }

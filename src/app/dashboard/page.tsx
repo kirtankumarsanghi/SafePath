@@ -4,6 +4,7 @@ import Link from "next/link";
 import DashboardLayout from "@/components/DashboardLayout";
 import PlanTile from "@/components/PlanTile";
 import { getJSON, shortDate, type MapSummary, type RunSummary } from "@/lib/workspace-client";
+import { getCustomMaps, toMapSummary } from "@/lib/custom-maps-storage";
 import { ShieldCheck, Activity, Terminal, Layers, DoorOpen, History, Server, FileText, ArrowRight, Play, Upload } from "lucide-react";
 
 export default function DashboardPage() {
@@ -31,23 +32,45 @@ export default function DashboardPage() {
     const controller = new AbortController();
     setLoading(true);
     setError("");
+    const custom = getCustomMaps().map(toMapSummary);
+
     Promise.all([
       getJSON<{ maps: MapSummary[] }>("/api/maps", { signal: controller.signal }),
       getJSON<{ runs: RunSummary[] }>("/api/runs", { signal: controller.signal })
     ])
       .then(([m, r]) => {
         if (!controller.signal.aborted) {
-          setMaps(m.maps);
+          const merged = [...custom, ...m.maps].filter((map, idx, arr) => arr.findIndex(x => x.id === map.id) === idx);
+          setMaps(merged);
           setRuns(r.runs);
         }
       })
       .catch(e => {
-        if (!controller.signal.aborted) setError(e.message);
+        if (!controller.signal.aborted) {
+          if (custom.length > 0) {
+            setMaps(custom);
+          } else {
+            setError(e.message);
+          }
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
+
+    const handleUpdate = () => {
+      const updatedCustom = getCustomMaps().map(toMapSummary);
+      setMaps(prev => {
+        const serverOnly = prev.filter(p => !updatedCustom.some(c => c.id === p.id));
+        return [...updatedCustom, ...serverOnly];
+      });
+    };
+
+    window.addEventListener("safepath-maps-updated", handleUpdate);
+    return () => {
+      controller.abort();
+      window.removeEventListener("safepath-maps-updated", handleUpdate);
+    };
   }, [retry]);
 
   const totalExits = useMemo(() => maps.reduce((count, map) => count + (map.exits?.length ?? 0), 0), [maps]);

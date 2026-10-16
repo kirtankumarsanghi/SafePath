@@ -67,7 +67,7 @@ export async function analyzeFileInBrowser(file: File): Promise<AnalysisReport> 
     img.onload = () => {
       URL.revokeObjectURL(objectUrl);
       try {
-        const maxDim = 1800;
+        const maxDim = 1200;
         let width = img.naturalWidth;
         let height = img.naturalHeight;
         if (width < 80 || height < 80) {
@@ -111,7 +111,11 @@ export async function analyzeFileInBrowser(file: File): Promise<AnalysisReport> 
         const validation = validationFor(labels, candidates, conversion, objects, legendRegions);
         const labelCounts = semanticCounts(objects, legendRegions);
 
-        const imageUrl = canvas.toDataURL("image/webp", 0.92);
+        // Highly compressed webp/jpeg so total JSON payload stays well under Vercel's 4.5 MB limit
+        let imageUrl = canvas.toDataURL("image/webp", 0.82);
+        if (!imageUrl.startsWith("data:image/webp")) {
+          imageUrl = canvas.toDataURL("image/jpeg", 0.82);
+        }
 
         const report: AnalysisReport = {
           version: 2,
@@ -168,27 +172,35 @@ export async function uploadForAnalysis(
     return analyzeFileInBrowser(file);
   }
 
+  // Attempt server analysis with a fast 5-second deadline so Vercel cold starts / slow OCR
+  // never leave the user waiting for minutes.
+  const serverController = new AbortController();
+  const serverTimer = setTimeout(() => serverController.abort(), 5000);
+  const handleAbort = () => serverController.abort();
+  signal?.addEventListener("abort", handleAbort, { once: true });
+
   try {
     const form = new FormData();
     form.set("file", file);
     form.set("ocr", String(ocr));
-    const response = await fetch("/api/maps/analyze", { method: "POST", body: form, signal });
+    const response = await fetch("/api/maps/analyze", {
+      method: "POST",
+      body: form,
+      signal: serverController.signal,
+    });
 
+    clearTimeout(serverTimer);
     if (response.ok) {
       const data = await response.json().catch(() => null);
       if (data?.analysis) return data.analysis;
     }
-    console.warn(
-      `[SafePath] Server analyzer returned status ${response.status}; using instant in-browser canvas analysis.`
-    );
   } catch (err) {
     if (signal?.aborted) throw err;
-    console.warn(
-      "[SafePath] Server analyzer unreachable; using instant in-browser canvas analysis:",
-      err
-    );
+  } finally {
+    clearTimeout(serverTimer);
+    signal?.removeEventListener("abort", handleAbort);
   }
 
-  // Graceful, guaranteed client-side fallback
+  // Guaranteed, instantaneous client-side fallback
   return analyzeFileInBrowser(file);
 }
