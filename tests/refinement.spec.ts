@@ -26,7 +26,7 @@ test('paint, undo, stale-result invalidation, draft persistence, partial update 
     await page.getByRole('button', { name: 'Undo grid edit', exact: true }).click();
     await page.getByLabel('Map name', { exact: true }).fill(`E2E manual plan ${Date.now()}`);
     const savedResponse = page.waitForResponse(r => r.url().endsWith('/api/maps') && r.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Save draft', exact: true }).click();
+    await page.getByRole('button', { name: 'Save draft', exact: true }).first().click();
     const response = await savedResponse; expect(response.status()).toBe(201); const saved = await response.json(); id = saved.map.id;
     expect(saved.map.starts).toEqual([{ x: 4, y: 4 }]); expect(saved.map.exits).toEqual([{ x: 20, y: 4 }]); expect(saved.map.gridData['10,4']).toBe('empty');
     await expect(page).toHaveURL(`${BASE}/maps/${id}?saved=1`);
@@ -40,13 +40,13 @@ test('paint, undo, stale-result invalidation, draft persistence, partial update 
     await expect(page.getByTestId('loaded-map-title')).toHaveText(saved.map.title);
     await expect(page.getByRole('button', { name: 'Show final route', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Show final route', exact: true }).click();
-    await expect(page.locator('.plan-sim-stats').getByText('16.00', { exact: true })).toBeVisible();
+    await expect(page.locator('.plan-sim-stats div').filter({ hasText: 'Path cost' })).toContainText('16.00');
     const run = await request.post(`${BASE}/api/runs`, { data: { mapId: id, title: 'Client sent fake statistics', totalPathCost: -12345, nodesExplored: -22 } });
     expect(run.status()).toBe(201); const computed = await run.json(); expect(computed.run.totalPathCost).toBe(16); expect(computed.run.nodesExplored).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Toggle fire', exact: true }).click(); await cell(page, 10, 4);
     await expect(page.getByRole('button', { name: 'Show final route', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Show final route', exact: true }).click();
-    await expect(page.locator('.plan-sim-stats').getByText('18.00', { exact: true })).toBeVisible();
+    await expect(page.locator('.plan-sim-stats div').filter({ hasText: 'Path cost' })).toContainText('18.00');
   } finally { if (id) await request.delete(`${BASE}/api/maps/${id}`); }
 });
 test('changed resolution is applied atomically and never mismatches the preview grid', async ({ page }) => {

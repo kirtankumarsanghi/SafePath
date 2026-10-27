@@ -262,18 +262,18 @@ export function convertPixels(image: PixelImage, options: ConversionOptions, lab
   const region = countRegions(grid, cols, rows), graph = summarizeGridGraph(grid, cols, rows), wallSegments = extractWallSegments(grid, cols, rows, crop, image.width, image.height), warnings: string[] = [];
   if (walls < size * .012) warnings.push("Few definite wall cells were extracted. Pale regions are only walkable candidates. Check contrast and hand-draw walls from the source.");
   if (walls > size * .62) warnings.push("Most cells are classified as walls. Try another threshold or polarity and compare each result against the source.");
-  if (unknown) warnings.push(`${unknown} grid cells are unknown (image edge, colored annotation, legend exclusion, or ambiguous line evidence); unknown cells block routing until reviewed.`);
+  if (unknown) warnings.push(`${unknown} grid cells are unknown (image edge, colored annotation, legend exclusion, or ambiguous line evidence); unknown cells remain walkable candidates and should be reviewed.`);
   if (options.excludedRegions.length) warnings.push(`${options.excludedRegions.length} OCR-detected legend region(s) are excluded from navigable space. Review each detected legend boundary before saving.`);
   if (region.count > 1) warnings.push(`${region.count} separate connected walkable candidate regions remain. Check door openings and partitions; disconnected regions were not deleted.`);
   if (uncertainCells) warnings.push(`${uncertainCells} cells have partial wall evidence. The displayed coverage is a pixel measurement, not a probability.`);
-  const counts = { WALL: walls, WALKABLE_CANDIDATE: size - walls - unknown, UNKNOWN: unknown, ACTIVE_FIRE_HAZARD: 0 };
+  const counts = { WALL: walls, WALKABLE_CANDIDATE: size - walls, UNKNOWN: unknown, ACTIVE_FIRE_HAZARD: 0 };
   const checks: ValidationCheck[] = [
     { id: "grid-dimensions", status: Object.keys(grid).length === size ? "PASS" : "FAIL", message: `Grid has ${Object.keys(grid).length} cells; expected ${size}.`, count: Object.keys(grid).length },
     { id: "coordinate-trace", status: Object.keys(cellEvidence).length === size ? "PASS" : "FAIL", message: "Every grid cell has a source-image pixel rectangle.", count: Object.keys(cellEvidence).length },
     { id: "semantic-separation", status: counts.ACTIVE_FIRE_HAZARD === 0 ? "PASS" : "FAIL", message: "The image analyzer never invents an active-fire scenario; scenario hazards come from explicit user input.", count: counts.ACTIVE_FIRE_HAZARD },
-    { id: "unknown-cells", status: unknown ? "REVIEW" : "PASS", message: unknown ? `${unknown} unknown cells are impassable until manually reviewed.` : "No unknown annotations or uncertain wall cells remain; verify the image edges regardless." , count: unknown },
+    { id: "unknown-cells", status: unknown ? "REVIEW" : "PASS", message: unknown ? `${unknown} unknown cells are walkable review candidates; confirm them against the source before saving.` : "No unknown annotations or uncertain wall cells remain; verify the image edges regardless." , count: unknown },
     { id: "walkable-connectivity", status: region.count > 1 ? "REVIEW" : "PASS", message: region.count > 1 ? `${region.count} separate walkable candidate regions are preserved; a break may be a real wall or an extraction error.` : "One 4-connected walkable candidate component; this does not prove that all real doorways were detected.", count: region.count },
-    { id: "graph-wall-clearance", status: "PASS", message: "Graph edges are created only between adjacent cells that are not walls, windows, fires, blocked or unknown.", count: graph.undirectedEdgeCount },
+    { id: "graph-wall-clearance", status: "PASS", message: "Graph edges are created only between adjacent cells that are not walls, windows, fires or blocked.", count: graph.undirectedEdgeCount },
     { id: "door-exit-verification", status: "REVIEW", message: "Door openings and usable exits are not inferred from a missing wall pixel or a sign alone. Confirm each passage and actual door on the source." },
     { id: "floor-connections", status: "REVIEW", message: "This upload is one floor. Stairs/elevators do not create vertical connections; analyze each floor separately." },
   ];
@@ -310,7 +310,7 @@ export function candidatePosition(candidate: PlanCandidate, options: ConversionO
   const crop = options.crop, x = ((candidate.box.left + candidate.box.right) / 2 - crop.left) / (crop.right - crop.left), y = ((candidate.box.top + candidate.box.bottom) / 2 - crop.top) / (crop.bottom - crop.top);
   if (x < 0 || y < 0 || x >= 1 || y >= 1) return null;
   const cx = Math.floor(x * options.cols), cy = Math.floor(y * options.rows), choices: (Point & { d: number })[] = [];
-  for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const px = cx + dx, py = cy + dy; if (px >= 0 && py >= 0 && px < options.cols && py < options.rows && !isBlocked(grid[`${px},${py}`])) choices.push({ x: px, y: py, d: dx * dx + dy * dy }); }
+  for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) { const px = cx + dx, py = cy + dy; if (px >= 0 && py >= 0 && px < options.cols && py < options.rows && !isBlocked(grid[`${px},${py}`])) choices.push({ x: px, y: py, d: dx * dx + dy * dy }); }
   choices.sort((a, b) => a.d - b.d); return choices[0] ? { x: choices[0].x, y: choices[0].y } : null;
 }
 

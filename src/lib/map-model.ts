@@ -1,5 +1,5 @@
 import { isBlocked, pointKey, samePoint, type CellType, type Point } from "./astar";
-import { validCrop, validateConversionOptions, type SavedAnalysis } from "./map-analysis";
+import { validateConversionOptions, type SavedAnalysis } from "./map-analysis";
 export interface GridDocument {
   gridWidth: number; gridHeight: number; gridData: Record<string, CellType>;
   starts: Point[]; exits: Point[]; obstacles: Point[];
@@ -28,15 +28,16 @@ export function applyTool(doc: GridDocument, tool: EditTool, p: Point): GridDocu
   }
   const removeAnchors = tool === "wall" || tool === "blocked" || tool === "erase";
   const obstacles = doc.obstacles.filter(q => !samePoint(q, p));
+  const terrain: CellType = tool === "wall" ? "wall" : tool === "blocked" ? "blocked" : tool === "fire" ? doc.gridData[k] ?? "empty" : "empty";
   return {
     ...doc,
-    gridData: { ...doc.gridData, [k]: tool === "wall" ? "wall" : tool === "blocked" ? "blocked" : "empty" },
+    gridData: { ...doc.gridData, [k]: terrain },
     starts: removeAnchors ? doc.starts.filter(q => !samePoint(q, p)) : doc.starts,
     exits: removeAnchors ? doc.exits.filter(q => !samePoint(q, p)) : doc.exits,
     obstacles: tool === "fire" ? [...obstacles, p] : obstacles,
   };
 }
-export function inspectDocument(doc: GridDocument) {
+export function inspectDocument(doc: GridDocument, options: { allowDiagonal?: boolean } = {}) {
   const errors: string[] = [];
   if (!doc.starts.length) errors.push("Place at least one person on a walkable cell.");
   if (!doc.exits.length) errors.push("Confirm an exit candidate or mark a real exit on the grid.");
@@ -48,8 +49,12 @@ export function inspectDocument(doc: GridDocument) {
   queue.forEach(p => reached.add(pointKey(p)));
   for (let head = 0; head < queue.length; head++) {
     const p = queue[head];
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const directions: [number, number][] = options.allowDiagonal
+      ? [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]
+      : [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of directions) {
       const n = { x: p.x + dx, y: p.y + dy }, key = pointKey(n);
+      if (dx !== 0 && dy !== 0 && (!free({ x: p.x + dx, y: p.y }) || !free({ x: p.x, y: p.y + dy }))) continue;
       if (!free(n) || reached.has(key)) continue;
       reached.add(key); queue.push(n);
     }
@@ -96,7 +101,7 @@ export function parseMapInput(value: unknown) {
     return result;
   };
   const starts = points("starts", 12), exits = points("exits", 32), obstacles = points("obstacles", width * height);
-  const dataImage = (field: string, maxLength: number, types: string): string | null => {
+  const dataImage = (field: string, maxLength: number): string | null => {
     const rawVal = b[field];
     if (rawVal == null) return null;
     if (typeof rawVal !== "string") {
@@ -111,7 +116,7 @@ export function parseMapInput(value: unknown) {
     return null;
   };
   // `null` here means "keep whatever the server already stores".
-  const imageUrl = dataImage("imageUrl", 8_000_000, "webp|png|jpeg|jpg|gif|avif|tiff"), sourceImage = dataImage("sourceImage", 16_900_000, "png|jpeg|webp|gif|tiff|avif|heif");
+  const imageUrl = dataImage("imageUrl", 8_000_000), sourceImage = dataImage("sourceImage", 16_900_000);
   const analysis = b.analysis as SavedAnalysis | null | undefined;
   if (analysis) {
     if (analysis.version !== 2 || !analysis.options || !Array.isArray(analysis.labels) || analysis.labels.length > 1000 || !Array.isArray(analysis.candidates) || analysis.candidates.length > 100 || typeof analysis.reviewed !== "boolean") fail("Invalid analysis metadata.");

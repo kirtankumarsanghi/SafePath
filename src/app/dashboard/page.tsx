@@ -5,7 +5,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import PlanTile from "@/components/PlanTile";
 import { getJSON, shortDate, type MapSummary, type RunSummary } from "@/lib/workspace-client";
 import { getCustomMaps, toMapSummary } from "@/lib/custom-maps-storage";
-import { ShieldCheck, Activity, Terminal, Layers, DoorOpen, History, Server, FileText, ArrowRight, Play, Upload } from "lucide-react";
+import { ShieldCheck, Terminal } from "lucide-react";
 
 export default function DashboardPage() {
   const [maps, setMaps] = useState<MapSummary[]>([]);
@@ -30,8 +30,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
     const custom = getCustomMaps().map(toMapSummary);
 
     Promise.all([
@@ -97,8 +95,8 @@ export default function DashboardPage() {
             </p>
           </div>
           <div className="workspace-actions">
-            <a className="site-button" href="/simulator">Launch A* Simulator</a>
-            <a className="site-button primary" href="/maps/new">Upload floor plan</a>
+            <Link className="site-button" href="/simulator">Launch A* Simulator</Link>
+            <Link className="site-button primary" href="/maps/new">Upload floor plan</Link>
           </div>
         </header>
 
@@ -113,7 +111,7 @@ export default function DashboardPage() {
         {error && (
           <div className="workspace-alert" role="alert">
             {error}{" "}
-            <button className="site-link" type="button" onClick={() => setRetry(r => r + 1)}>
+            <button className="site-link" type="button" onClick={() => { setLoading(true); setError(""); setRetry(r => r + 1); }}>
               Retry sync
             </button>
           </div>
@@ -169,9 +167,9 @@ export default function DashboardPage() {
                   <p>
                     Convert a raster floor-plan into a navigable grid. SafePath separates text labels and equipment icons to isolate masonry lines.
                   </p>
-                  <a className="site-button primary" href="/maps/new">
+                  <Link className="site-button primary" href="/maps/new">
                     Upload your first drawing
-                  </a>
+                  </Link>
                 </div>
               ) : (
                 <div className="plan-library">
@@ -292,7 +290,7 @@ export default function DashboardPage() {
                   <strong>Confirmed exits:</strong> Color blobs are unverified suggestions. Confirm the real exit positions before simulating.
                 </li>
                 <li>
-                  <strong>Exclude annotation area:</strong> Keep legends, margins, and textual keys separate from the building's navigability.
+                  <strong>Exclude annotation area:</strong> Keep legends, margins, and textual keys separate from the building&apos;s navigability.
                 </li>
               </ul>
             </section>

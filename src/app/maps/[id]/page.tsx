@@ -22,12 +22,15 @@ export default function MapEditPage() {
     const localMap = getCustomMapById(id);
 
     if (localMap) {
-      setMap(localMap);
-      setDoc({ ...localMap, gridData: cleanTerrain(localMap.gridData) });
-      setTitle(localMap.title);
-      setDescription(localMap.description ?? "");
-      setReviewed(!localMap.imageUrl || !!localMap.analysis?.reviewed);
-      setLoading(false);
+      queueMicrotask(() => {
+        if (abort.signal.aborted) return;
+        setMap(localMap);
+        setDoc({ ...localMap, gridData: cleanTerrain(localMap.gridData) });
+        setTitle(localMap.title);
+        setDescription(localMap.description ?? "");
+        setReviewed(!localMap.imageUrl || !!localMap.analysis?.reviewed);
+        setLoading(false);
+      });
     }
 
     fetch(`/api/maps/${id}`, { signal: abort.signal })

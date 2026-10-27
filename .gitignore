@@ -39,3 +39,6 @@ next-env.d.ts
 
 # local postgres database data
 /.pgdata/
+
+# local agent workspace
+/.commandcode/

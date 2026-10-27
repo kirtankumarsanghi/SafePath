@@ -47,13 +47,13 @@ test("real upload, OCR, reviewed refinement, atomic save, exact-map A* and reloa
     await expect(page.getByRole('button', { name: 'Show final route', exact: true })).toBeEnabled({ timeout: 20000 });
     await page.getByRole('button', { name: 'Show final route', exact: true }).click();
     await expect(page.getByText('Goal reached', { exact: true })).toBeVisible();
-    await expect(page.locator('.plan-sim-stats').getByText(expectedCost.toFixed(2), { exact: true })).toBeVisible();
+    await expect(page.locator('.plan-sim-stats div').filter({ hasText: 'Path cost' })).toContainText(expectedCost.toFixed(2));
     await page.screenshot({ path: '/tmp/safepath-simulator.png', fullPage: true });
     await page.getByLabel('Heuristic', { exact: true }).selectOption('euclidean');
     await expect(page.getByRole('button', { name: 'Show final route', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Show final route', exact: true }).click();
     await expect(page.getByText('Goal reached', { exact: true })).toBeVisible();
-    await expect(page.locator('.plan-sim-stats').getByText(expectedCost.toFixed(2), { exact: true })).toBeVisible();
+    await expect(page.locator('.plan-sim-stats div').filter({ hasText: 'Path cost' })).toContainText(expectedCost.toFixed(2));
     await page.reload();
     await expect(page.getByTestId('loaded-map-title')).toHaveText(data.map.title);
     await expect(page.getByRole('button', { name: 'Show final route', exact: true })).toBeEnabled();

@@ -8,7 +8,7 @@
   --site-muted: #a1a3a8;
   --site-faint: #70747c;
   --site-line: #282a2f;
-  --site-font: "Inter", "Segoe UI", system-ui, sans-serif;
+  --site-font: var(--font-inter, "Inter"), "Segoe UI", system-ui, sans-serif;
   --site-width: 1280px;
   --site-gutter: clamp(20px, 4vw, 64px);
   --site-header-height: 84px;

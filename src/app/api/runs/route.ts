@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDatabaseReady, isDatabaseConfigured } from "@/db";
 import { runs, floorMaps } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { MapInputError, parseMapInput, inspectDocument } from "@/lib/map-model";
+import { MapInputError, parseMapInput } from "@/lib/map-model";
 import { runEvacuation, type HeuristicType } from "@/lib/astar";
 import { runRecord } from "@/lib/run-storage";
 import { verifyToken } from "@/lib/auth";

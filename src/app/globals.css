@@ -2,9 +2,9 @@
 @import "./planner.css";
 @import "./shell.css";
 @custom-variant dark (&:where(.dark, .dark *));
-@theme { --font-sans: "Inter", "Segoe UI", system-ui, sans-serif; }
+@theme { --font-sans: var(--font-inter, "Inter"), "Segoe UI", system-ui, sans-serif; }
 html { background: #08090b; scroll-behavior: smooth; }
-body { margin: 0; background: #08090b; color: #f4f4f2; font-family: "Inter", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { margin: 0; background: #08090b; color: #f4f4f2; font-family: var(--font-inter, "Inter"), "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 button:not(:disabled), a { -webkit-tap-highlight-color: transparent; }
 ::-webkit-scrollbar { width: 7px; height: 7px; }
 ::-webkit-scrollbar-track { background: #101114; }

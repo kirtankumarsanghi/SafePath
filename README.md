@@ -12,7 +12,7 @@ Turn an architectural blueprint into a reviewable graph, then compute, visualize
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PGlite-336791?logo=postgresql&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-11%20unit%20%7C%2019%20E2E-brightgreen)
+![Tests](https://img.shields.io/badge/tests-13%20unit%20%7C%2020%20E2E-brightgreen)
 
 </div>
 
@@ -190,26 +190,26 @@ Notable API routes:
 
 ## Testing
 
-**Unit tests (11):** admissibility, boundary conditions, dynamic hazards and OCR precision.
+**Unit tests (13):** admissibility, boundary conditions, dynamic hazards, OCR precision, window blocking, walkable unknown cells, fire-tool terrain preservation and diagonal pre-checks.
 
 ```bash
 npx tsx --test tests/astar.test.ts tests/map-analysis.test.ts
 ```
 
-**End-to-end tests (19):** run with the app already running.
+**End-to-end tests (20):** `playwright.config.ts` starts the app automatically when it is not already running, and only collects `*.spec.ts` files.
 
 ```bash
-npx playwright test \
-  tests/landing.spec.ts tests/design-system.spec.ts tests/account.spec.ts \
-  tests/upload.spec.ts tests/refinement.spec.ts tests/monochrome.spec.ts \
-  tests/image-retention.spec.ts --workers=1
+npx playwright test
 ```
 
 The E2E suite covers pixel-level header parity between the static homepage and the app, matching mobile breakpoints, keyboard focus handling, route links, real counts and previews, signup/profile persistence/sign-out, PNG and monochrome uploads, correction and undo, route validation, dynamic hazards and preservation of uploaded images when editing.
 
+CI (`.github/workflows/ci.yml`) runs lint, typecheck, unit tests, the production build and the full E2E suite against a disposable PostgreSQL service.
+
 ## Model assumptions and limitations
 
-- Unknown cells, walls, windows and blocked passages are **impassable**.
+- Walls, windows and blocked passages are **impassable**.
+- Unknown cells stay **walkable review candidates**; check them against the source before trusting a route.
 - Red and green symbols are **review candidates**, not inferred hazards or verified exits.
 - Grid distances are **model units**, not physical evacuation times.
 - Occupants are routed **independently**. Congestion and exit capacity are not modeled.

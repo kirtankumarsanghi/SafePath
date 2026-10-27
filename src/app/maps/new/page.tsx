@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, UploadCloud, ScanText, Grid3X3, DoorOpen, Route, Check, CheckCircle2, AlertTriangle, Loader2, FileImage, X, SlidersHorizontal, ShieldCheck, Save, RotateCcw, Info, ChevronDown, UserRound, Eye, PencilRuler } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import GridView, { type GridMarker } from "@/components/GridView";
 import FloorPlanEditor from "@/components/FloorPlanEditor";
 import { uploadForAnalysis, reconvertImage } from "@/lib/imageToGrid";
-import { candidatePosition, countRegions, resolutionFor, DEFAULT_CONVERSION, FULL_BOUNDS, type AnalysisReport, type ConversionOptions, type PlanCandidate, type SavedAnalysis } from "@/lib/map-analysis";
+import { candidatePosition, countRegions, resolutionFor, DEFAULT_CONVERSION, type AnalysisReport, type ConversionOptions, type PlanCandidate, type SavedAnalysis } from "@/lib/map-analysis";
 import { inspectDocument, requestHeaders, type GridDocument, type SavedMap } from "@/lib/map-model";
 import { computeEvacuation } from "@/lib/compute-client";
 import { samePoint, colorForIndex, type AStarRunResult } from "@/lib/astar";
@@ -19,17 +20,17 @@ export default function NewMapPage() {
   const router = useRouter();
   const [stage, setStage] = useState(0), [report, setReport] = useState<AnalysisReport | null>(null), [doc, setDoc] = useState<GridDocument | null>(null);
   const [options, setOptions] = useState<ConversionOptions>(DEFAULT_CONVERSION), [applied, setApplied] = useState<ConversionOptions>(DEFAULT_CONVERSION);
-  const [busy, setBusy] = useState<"analyze" | "convert" | "save" | null>(null), [error, setError] = useState(""), [drag, setDrag] = useState(false);
+  const [busy, setBusy] = useState<"analyze" | "convert" | "save" | null>(null), [error, setError] = useState(""), [drag, setDrag] = useState(false), [hasLastFile, setHasLastFile] = useState(false);
   const [view, setView] = useState<"image" | "overlay" | "grid">("overlay"), [selected, setSelected] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Record<string, "accepted" | "dismissed">>({});
-  const [title, setTitle] = useState(""), [description, setDescription] = useState(""), [reviewed, setReviewed] = useState(false), [edited, setEdited] = useState(false);
+  const [title, setTitle] = useState(""), [description, setDescription] = useState(""), [reviewed, setReviewed] = useState(false);
   const [evaluation, setEvaluation] = useState<AStarRunResult[] | null>(null), [evaluating, setEvaluating] = useState(false);
   const [fileName, setFileName] = useState(""), [elapsed, setElapsed] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null), controller = useRef<AbortController | null>(null), evaluationController = useRef<AbortController | null>(null), lastFile = useRef<File | null>(null);
   useEffect(() => () => { controller.current?.abort(); evaluationController.current?.abort(); }, []);
   useEffect(() => {
     if (busy !== "analyze") return;
-    setElapsed(0); const timer = setInterval(() => setElapsed(s => s + 1), 1000);
+    const timer = setInterval(() => setElapsed(s => s + 1), 1000);
     return () => clearInterval(timer);
   }, [busy]);
   const settingsDirty = JSON.stringify(options) !== JSON.stringify(applied);
@@ -43,18 +44,18 @@ export default function NewMapPage() {
   const allRouted = !!evaluation?.length && evaluation.every(r => r.reached);
   const ready = allRouted && reviewed && !inspection?.errors.length && !settingsDirty;
   const changeDocument = (next: GridDocument) => {
-    evaluationController.current?.abort(); setEvaluating(false); setEvaluation(null); setReviewed(false); setEdited(true); setDoc(next); setError("");
+    evaluationController.current?.abort(); setEvaluating(false); setEvaluation(null); setReviewed(false); setDoc(next); setError("");
   };
   async function analyze(file: File, ocr = true) {
     controller.current?.abort(); evaluationController.current?.abort();
     const abort = new AbortController(); controller.current = abort;
-    lastFile.current = file; setFileName(file.name); setBusy("analyze"); setError(""); setStage(0); setReport(null); setDoc(null); setEvaluation(null); setDecisions({}); setReviewed(false); setEdited(false);
+    lastFile.current = file; setHasLastFile(true); setElapsed(0); setFileName(file.name); setBusy("analyze"); setError(""); setStage(0); setReport(null); setDoc(null); setEvaluation(null); setDecisions({}); setReviewed(false);
     const timeout = setTimeout(() => abort.abort("timeout"), 75000);
     try {
       const result = await uploadForAnalysis(file, abort.signal, ocr);
       if (abort.signal.aborted) return;
       setReport(result); setOptions(result.options); setApplied(result.options); setDecisions({});
-      const withCoords = ensureValidCoordinates({ gridWidth: result.conversion.cols, gridHeight: result.conversion.rows, gridData: result.conversion.grid, starts: [], exits: [], obstacles: [] });
+      const withCoords = ensureValidCoordinates({ gridWidth: result.conversion.cols, gridHeight: result.conversion.rows, gridData: result.conversion.grid, starts: [], exits: [], obstacles: [] }, { addDefaults: false });
       setDoc(withCoords.doc);
       setTitle(file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, 255)); setDescription(""); setStage(1); setView("overlay");
     } catch (e) {
@@ -73,9 +74,9 @@ export default function NewMapPage() {
       await new Promise(r => setTimeout(r, 20));
       const result = await reconvertImage(report.imageUrl, options, report.labels);
       setReport({ ...report, conversion: result }); setApplied({ ...options });
-      const withCoords = ensureValidCoordinates({ gridWidth: result.cols, gridHeight: result.rows, gridData: result.grid, starts: doc.starts, exits: doc.exits, obstacles: doc.obstacles });
+      const withCoords = ensureValidCoordinates({ gridWidth: result.cols, gridHeight: result.rows, gridData: result.grid, starts: doc.starts, exits: doc.exits, obstacles: doc.obstacles }, { addDefaults: false });
       setDoc(withCoords.doc);
-      setDecisions({}); setEvaluation(null); setReviewed(false); setEdited(false);
+      setDecisions({}); setEvaluation(null); setReviewed(false);
     } catch (e) { setError(messageOf(e)); } finally { setBusy(null); }
   }
   async function proceedToRefine() {
@@ -228,8 +229,8 @@ export default function NewMapPage() {
         <div className="upload-glyph"><UploadCloud size={32} strokeWidth={1.5} /></div><h2>Drop a floor plan here</h2><p>or choose an image from your device</p><span className="plan-btn primary">Choose image <ArrowRight size={16} /></span><div className="plan-formats"><span>PNG</span><span>JPG</span><span>WEBP</span><span>GIF / TIFF / AVIF</span></div><small>Up to 12 MB · A clear, straight-on plan works best</small>
       </div>}
       {!busy && <div className="upload-secondary"><button onClick={blank}><PencilRuler size={16} />Draw a grid from scratch</button>{doc && <button onClick={() => setStage(report ? 1 : 2)}>Return to current map <ArrowRight size={15} /></button>}</div>}
-      {error && lastFile.current && !busy && <div className="upload-retry"><button className="plan-btn secondary" onClick={() => lastFile.current && analyze(lastFile.current)}>Retry analysis</button><button className="plan-btn secondary" onClick={() => lastFile.current && analyze(lastFile.current, false)}>Analyze without OCR</button></div>}
-    </section><aside className="plan-upload-aside"><section className="plan-card plan-pad"><div className="plan-section-heading"><h3>What happens next</h3></div><div className="plan-how"><ScanText size={20} /><div><strong>Read the image</strong><p>Local OCR locates labels. Color analysis flags safety symbols for review.</p></div></div><div className="plan-how"><Grid3X3 size={20} /><div><strong>Build a navigable grid</strong><p>High-resolution line and pixel analysis preserves walls and separate rooms.</p></div></div><div className="plan-how"><Route size={20} /><div><strong>Refine and run A*</strong><p>Confirm real exits, place people, correct doors and validate the routes.</p></div></div></section><button className="plan-sample" disabled={!!busy} onClick={sample}><div className="sample-picture">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/samples/campus-plan.png" alt="Sample campus floor plan with two exits" /></div><div><span>NO IMAGE HANDY?</span><strong>Try a sample floor plan <ArrowRight size={16} /></strong><small>Uses the same upload and analysis pipeline</small></div></button></aside></div>}
+      {error && hasLastFile && !busy && <div className="upload-retry"><button className="plan-btn secondary" onClick={() => lastFile.current && analyze(lastFile.current)}>Retry analysis</button><button className="plan-btn secondary" onClick={() => lastFile.current && analyze(lastFile.current, false)}>Analyze without OCR</button></div>}
+    </section><aside className="plan-upload-aside"><section className="plan-card plan-pad"><div className="plan-section-heading"><h3>What happens next</h3></div><div className="plan-how"><ScanText size={20} /><div><strong>Read the image</strong><p>Local OCR locates labels. Color analysis flags safety symbols for review.</p></div></div><div className="plan-how"><Grid3X3 size={20} /><div><strong>Build a navigable grid</strong><p>High-resolution line and pixel analysis preserves walls and separate rooms.</p></div></div><div className="plan-how"><Route size={20} /><div><strong>Refine and run A*</strong><p>Confirm real exits, place people, correct doors and validate the routes.</p></div></div></section><button className="plan-sample" disabled={!!busy} onClick={sample}><div className="sample-picture"><Image src="/samples/campus-plan.png" alt="Sample campus floor plan with two exits" width={1200} height={840} /></div><div><span>NO IMAGE HANDY?</span><strong>Try a sample floor plan <ArrowRight size={16} /></strong><small>Uses the same upload and analysis pipeline</small></div></button></aside></div>}
     {stage > 0 && doc && <>
       <div className="plan-file-strip"><span className="file-glyph"><FileImage size={21} /></span><div><strong>{report?.fileName ?? "Custom drawn floor plan"}</strong><span>{report ? `${report.width} × ${report.height} pixels · ${report.ocrStatus === "complete" ? "OCR complete" : "Manual text review needed"}` : "Manual grid editor"}</span></div><span className="plan-pill neutral">Source preserved</span><button disabled={!!busy} onClick={() => inputRef.current?.click()} className="plan-text-btn">Replace image</button></div>
       <div className="plan-stat-strip"><div><Grid3X3 size={18} /><strong>{doc.gridWidth} × {doc.gridHeight}</strong><span>Grid dimensions</span></div><div><SquareIcon /><strong>{inspection?.walls ?? 0}</strong><span>Blocked cells</span></div><div><ScanText size={18} /><strong>{report?.labels.length ?? 0}</strong><span>Labels read</span></div><div><DoorOpen size={18} /><strong>{doc.exits.length}<small> / {report?.candidates.filter(c => c.kind === "exit").length ?? 0}</small></strong><span>Confirmed / suggested exits</span></div><div><UserRound size={18} /><strong>{doc.starts.length}</strong><span>People placed</span></div></div>
@@ -248,7 +249,7 @@ export default function NewMapPage() {
           <button className="plan-btn secondary full" disabled={!settingsDirty || !!busy} onClick={applySettings}>{busy === "convert" ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}Apply conversion settings</button>{settingsDirty && <p className="plan-small plan-emphasis">Unapplied changes. The preview still shows the previous conversion.</p>}
         </section>}
         {candidatePanel}
-        {stage === 2 && <section className="plan-card plan-pad plan-save-panel"><h3>Name & save your map</h3><label htmlFor="map-title">Map name</label><input id="map-title" value={title} maxLength={255} onChange={e => setTitle(e.target.value)} placeholder="Science building, ground floor" /><label htmlFor="map-description">Description <span>(optional)</span></label><textarea id="map-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Building, level and important notes" /><label className="plan-checkbox review-checkbox"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /><span>I checked the walls, doorways, exterior areas and actual exit positions against the source plan.</span></label><div className="plan-save-checks"><span className={allRouted ? "done" : ""}><Check size={14} />Routes validated on this grid</span><span className={reviewed ? "done" : ""}><Check size={14} />Source review confirmed</span></div><button className="plan-btn primary full" disabled={!!busy} onClick={() => save(true)}>{busy === "save" ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}Save & run A*</button><button className="plan-btn secondary full" disabled={!!busy} onClick={() => save(false)}>Save draft</button><p className="plan-small">Your source image, conversion settings, edits and computed result are saved together. Drafts can be refined later.</p></section>}
+        {stage === 2 && <section className="plan-card plan-pad plan-save-panel"><h3>Name & save your map</h3><label htmlFor="map-title">Map name</label><input id="map-title" value={title} maxLength={255} onChange={e => setTitle(e.target.value)} placeholder="Science building, ground floor" /><label htmlFor="map-description">Description <span>(optional)</span></label><textarea id="map-description" value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Building, level and important notes" /><label className="plan-checkbox review-checkbox"><input type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} /><span>I checked the walls, doorways, exterior areas and actual exit positions against the source plan.</span></label><div className="plan-save-checks"><span className={allRouted ? "done" : ""}><Check size={14} />Routes validated on this grid</span><span className={reviewed ? "done" : ""}><Check size={14} />Source review confirmed</span></div><button className="plan-btn primary full" disabled={!ready || !!busy} onClick={() => save(true)}>{busy === "save" ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}Save & run A*</button><button className="plan-btn secondary full" disabled={!!busy} onClick={() => save(false)}>Save draft</button><p className="plan-small">Your source image, conversion settings, edits and computed result are saved together. Drafts can be refined later.</p></section>}
       </aside></div>
       <div className="plan-bottom-bar">
         <button className="plan-btn secondary" onClick={() => setStage(stage - 1)} disabled={!!busy}>
@@ -260,7 +261,7 @@ export default function NewMapPage() {
               {busy === "save" ? <Loader2 size={16} className="animate-spin mr-1" /> : <Route size={16} className="mr-1" />}
               Save & Run A* Now
             </button>
-            <button className="plan-btn secondary" disabled={busy === "convert"} onClick={proceedToRefine}>
+            <button className="plan-btn secondary" disabled={busy === "convert" || settingsDirty} onClick={proceedToRefine}>
               Refine grid & confirm exits <ArrowRight size={17} />
             </button>
           </div>

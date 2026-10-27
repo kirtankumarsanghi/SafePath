@@ -23,7 +23,7 @@ export interface AStarRunResult {
 export interface RunOptions { allowDiagonal?: boolean; maxSteps?: number; trace?: boolean }
 export const pointKey = (p: Point) => `${p.x},${p.y}`;
 export const samePoint = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
-export const isBlocked = (t: CellType | undefined) => t === "wall" || t === "fire" || t === "blocked";
+export const isBlocked = (t: CellType | undefined) => t === "wall" || t === "fire" || t === "blocked" || t === "window";
 export function cellCost(type: CellType): number { return isBlocked(type) ? Infinity : type === "obstacle" ? 3 : 1; }
 export function heuristicValue(a: Point, b: Point, type: HeuristicType): number {
   const dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
@@ -64,7 +64,15 @@ function search(grid: Record<string, CellType>, width: number, height: number, s
   const goals = exits.filter(traversable);
   const goalKeys = new Set(goals.map(pointKey));
   const diagonal = options.allowDiagonal ?? false;
-  const estimate = (p: Point) => Math.min(...goals.map(e => heuristicValue(p, e, heuristic))) / (diagonal && heuristic === "manhattan" ? Math.SQRT2 : 1);
+  const heuristicScale = diagonal && heuristic === "manhattan" ? Math.SQRT2 : 1;
+  const estimate = (p: Point) => {
+    let nearest = Infinity;
+    for (const goal of goals) {
+      const value = heuristicValue(p, goal, heuristic);
+      if (value < nearest) nearest = value;
+    }
+    return nearest / heuristicScale;
+  };
   const result: AStarRunResult = {
     start, exit: goals[0] ?? exits[0] ?? start, initial: null, path: [], steps: [], fMap: {}, reached: false, status: "unreachable",
     stats: { totalCost: Infinity, nodesExplored: 0, nodesInOpen: 0, nodesInClosed: 0, timeTakenMs: 0, heuristicUsed: heuristic },
@@ -129,14 +137,27 @@ export function runAStarWithSteps(grid: Record<string, CellType>, width: number,
 export function runEvacuation(grid: Record<string, CellType>, width: number, height: number, starts: Point[], exits: Point[], obstacles: Point[] = [], heuristic: HeuristicType = "manhattan", options: RunOptions = {}): AStarRunResult[] {
   return starts.map(start => search(grid, width, height, start, exits, obstacles, heuristic, options));
 }
-export function getSearchFrame(run: AStarRunResult | undefined, index: number) {
-  const open = new Set<string>(), closed = new Set<string>(); const fMap: Record<string, NodeValues> = {};
-  if (run?.initial) { const { x, y, ...v } = run.initial; const key = `${x},${y}`; open.add(key); fMap[key] = v; }
-  if (run) for (let i = 0; i <= Math.min(index, run.steps.length - 1); i++) {
-    const s = run.steps[i], key = pointKey(s.popped); open.delete(key); closed.add(key);
-    for (const { x, y, ...v } of s.updates) { const k = `${x},${y}`; closed.delete(k); open.add(k); fMap[k] = v; }
+export interface SearchFrame { open: Set<string>; closed: Set<string>; fMap: Record<string, NodeValues>; version: number }
+interface FrameCache extends SearchFrame {}
+/** One cache per run: advancing the playback cursor only applies the new steps. */
+const searchFrameCaches = new WeakMap<AStarRunResult, FrameCache>();
+function initialFrame(run: AStarRunResult): FrameCache {
+  const frame: FrameCache = { open: new Set(), closed: new Set(), fMap: {}, version: -1 };
+  if (run.initial) { const { x, y, ...v } = run.initial; const key = `${x},${y}`; frame.open.add(key); frame.fMap[key] = v; }
+  return frame;
+}
+/** Returns a cached, live view. Treat the sets as read-only: later calls may advance the same cache. */
+export function getSearchFrame(run: AStarRunResult | undefined, index: number): SearchFrame {
+  if (!run) return { open: new Set(), closed: new Set(), fMap: {}, version: -1 };
+  const target = Math.max(-1, Math.min(index, run.steps.length - 1));
+  let frame = searchFrameCaches.get(run);
+  if (!frame || target < frame.version) { frame = initialFrame(run); searchFrameCaches.set(run, frame); }
+  while (frame.version < target) {
+    const step = run.steps[++frame.version], key = pointKey(step.popped);
+    frame.open.delete(key); frame.closed.add(key);
+    for (const { x, y, ...v } of step.updates) { const k = `${x},${y}`; frame.closed.delete(k); frame.open.add(k); frame.fMap[k] = v; }
   }
-  return { open, closed, fMap };
+  return frame;
 }
 export function runAStar(grid: Record<string, CellType>, width: number, height: number, starts: Point[], exits: Point[], obstacles: Point[] = [], heuristic: HeuristicType = "manhattan") {
   const results = runEvacuation(grid, width, height, starts, exits, obstacles, heuristic, { trace: false });

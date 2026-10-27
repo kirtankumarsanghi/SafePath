@@ -7,22 +7,23 @@ export interface GridMarker { id: string; point: Point; kind: string; label: str
 interface GridViewProps {
   grid: Record<string, CellType>; cols: number; rows: number;
   starts: Point[]; exits: Point[]; fires: Point[];
-  openSet: Set<string>; closedSet: Set<string>; fMap: Record<string, NodeValues>;
+  openSet: Set<string>; closedSet: Set<string>; fMap: Record<string, NodeValues>; frameVersion?: number;
   paths: DrawnPath[]; showFValues: boolean; activeCell: Point | null;
   cellSize?: number; interactive?: boolean; onCellClick?: (p: Point) => void;
   imageUrl?: string | null; crop?: Bounds; view?: "grid" | "overlay" | "image";
   fit?: boolean; paint?: boolean; markers?: GridMarker[];
   onStrokeStart?: () => void; onStrokeEnd?: () => void; onInspect?: (p: Point) => void;
 }
-export default function GridView({ grid, cols, rows, starts, exits, fires, openSet, closedSet, fMap, paths, showFValues, activeCell, cellSize = 26, interactive = true, onCellClick, imageUrl, crop = FULL_BOUNDS, view = "grid", fit = true, paint = false, markers = [], onStrokeStart, onStrokeEnd, onInspect }: GridViewProps) {
+export default function GridView({ grid, cols, rows, starts, exits, fires, openSet, closedSet, fMap, frameVersion, paths, showFValues, activeCell, cellSize = 26, interactive = true, onCellClick, imageUrl, crop = FULL_BOUNDS, view = "grid", fit = true, paint = false, markers = [], onStrokeStart, onStrokeEnd, onInspect }: GridViewProps) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const [loadedImage, setLoadedImage] = useState<{ url: string; image: HTMLImageElement } | null>(null);
+  const image = loadedImage && loadedImage.url === imageUrl ? loadedImage.image : null;
   const [hover, setHover] = useState<Point | null>(null);
   const drawing = useRef(false), previous = useRef<Point | null>(null);
   const width = cols * cellSize, height = rows * cellSize;
   useEffect(() => {
-    let alive = true; setImage(null);
-    if (imageUrl) { const img = new Image(); img.onload = () => { if (alive) setImage(img); }; img.src = imageUrl; }
+    let alive = true;
+    if (imageUrl) { const img = new Image(); img.onload = () => { if (alive) setLoadedImage({ url: imageUrl, image: img }); }; img.src = imageUrl; }
     return () => { alive = false; };
   }, [imageUrl]);
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function GridView({ grid, cols, rows, starts, exits, fires, openS
     }
     const current = hover ?? activeCell;
     if (current) { ctx.strokeStyle = "#2563eb"; ctx.lineWidth = 2; ctx.strokeRect(current.x * cellSize + 1, current.y * cellSize + 1, cellSize - 2, cellSize - 2); }
-  }, [grid, cols, rows, starts, exits, fires, openSet, closedSet, fMap, paths, showFValues, activeCell, cellSize, image, crop, view, width, height, hover, markers]);
+  }, [grid, cols, rows, starts, exits, fires, openSet, closedSet, fMap, frameVersion, paths, showFValues, activeCell, cellSize, image, crop, view, width, height, hover, markers]);
   const pointAt = (e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const bounds = e.currentTarget.getBoundingClientRect();
     return { x: Math.max(0, Math.min(cols - 1, Math.floor((e.clientX - bounds.left) * cols / bounds.width))), y: Math.max(0, Math.min(rows - 1, Math.floor((e.clientY - bounds.top) * rows / bounds.height))) };

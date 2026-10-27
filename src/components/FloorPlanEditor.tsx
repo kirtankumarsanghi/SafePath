@@ -22,8 +22,9 @@ export default function FloorPlanEditor({ document: doc, onChange, imageUrl, cro
   const [tool, setTool] = useState<EditTool>(initialTool), [view, setView] = useState<"overlay" | "grid" | "image">(imageUrl ? "overlay" : "grid");
   const [zoom, setZoom] = useState(0), [brush, setBrush] = useState(1), [hover, setHover] = useState<Point | null>(null), [undoCount, setUndoCount] = useState(0);
   const [feedback, setFeedback] = useState("");
-  const history = useRef<GridDocument[]>([]), latest = useRef(doc); latest.current = doc;
-  useEffect(() => { history.current = []; setUndoCount(0); }, [doc.gridWidth, doc.gridHeight, imageUrl]);
+  const history = useRef<GridDocument[]>([]), latest = useRef(doc);
+  useEffect(() => { latest.current = doc; }, [doc]);
+  useEffect(() => { history.current = []; queueMicrotask(() => setUndoCount(0)); }, [doc.gridWidth, doc.gridHeight, imageUrl]);
   const paint = tool !== "person" && tool !== "exit";
   const edit = (p: Point) => {
     let next = latest.current; const r = paint ? Math.floor(brush / 2) : 0;

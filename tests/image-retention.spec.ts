@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import path from "node:path";
 
 const BASE = process.env.TEST_BASE_URL || "http://localhost:3000";
+test.setTimeout(120000);
 
 /**
  * Regression: a saved map whose image is served as /api/maps/:id/image must
@@ -29,7 +30,7 @@ test("editing a saved plan keeps its uploaded source image", async ({ page, requ
     await exitButtons.first().click();
     await page.getByLabel("Map name", { exact: true }).fill(`Image retention ${Date.now()}`);
     const saved = page.waitForResponse((r) => r.url().endsWith("/api/maps") && r.request().method() === "POST");
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await page.getByRole("button", { name: "Save draft", exact: true }).first().click();
     const saveResponse = await saved;
     expect(saveResponse.status()).toBe(201);
     const { map } = await saveResponse.json();

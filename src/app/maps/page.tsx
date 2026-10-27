@@ -12,9 +12,6 @@ export default function MapsPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError("");
-
     const localMaps = getCustomMaps().map(toMapSummary);
 
     getJSON<{ maps: MapSummary[] }>("/api/maps", { signal: controller.signal })
@@ -77,7 +74,7 @@ export default function MapsPage() {
         </div>
         <Link className="site-button primary" href="/maps/new">Upload a floor plan</Link>
       </header>
-      {error && <div className="workspace-alert" role="alert">{error} <button className="site-link" onClick={() => setRetry(n => n + 1)}>Reload plans</button></div>}
+      {error && <div className="workspace-alert" role="alert">{error} <button className="site-link" onClick={() => { setLoading(true); setError(""); setRetry(n => n + 1); }}>Reload plans</button></div>}
       {!loading && maps.length > 0 && <div className="plan-library-toolbar"><input aria-label="Search floor plans" type="search" placeholder="Search floor plans…" value={query} onChange={e => setQuery(e.target.value)} /><span>{filtered.length} of {maps.length} plans</span></div>}
       {loading ? <div className="plan-library" aria-label="Loading floor plans">{[1,2,3].map(i => <div key={i} className="workspace-skeleton" />)}</div> : !maps.length ? <div className="workspace-empty"><h2>{error ? "Floor plans are unavailable" : "No maps yet — upload your first floor plan"}</h2><p>Start with a clear image of one building level. You can refine its grid, mark exits and save it for later.</p><Link className="site-button primary" href="/maps/new">Upload your first plan</Link></div> : !filtered.length ? <div className="workspace-empty"><h2>No matching plans</h2><p>Try a different building name or description.</p><button className="site-button" onClick={() => setQuery("")}>Clear search</button></div> : <div className="plan-library">{filtered.map(map => <PlanTile key={map.id} map={map} onDelete={remove} />)}</div>}
     </DashboardLayout>

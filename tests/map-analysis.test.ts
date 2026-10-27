@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { convertPixels, detectCandidates, classifyLabel, DEFAULT_CONVERSION, FULL_BOUNDS, resolutionFor, candidatePosition, type PixelImage } from "../src/lib/map-analysis";
 import { parseMapInput, applyTool, inspectDocument, type GridDocument } from "../src/lib/map-model";
+import { isBlocked } from "../src/lib/astar";
 function image(w = 400, h = 300): PixelImage { const data = new Uint8Array(w * h * 4); data.fill(255); return { data, width: w, height: h }; }
 function fill(im: PixelImage, left: number, top: number, right: number, bottom: number, rgb: number[]) { for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) { const i = (y * im.width + x) * 4; im.data[i] = rgb[0]; im.data[i + 1] = rgb[1]; im.data[i + 2] = rgb[2]; } }
 test("thin walls survive, all rooms survive, and no border exits are invented", () => {
@@ -34,4 +35,22 @@ test("edit tools enforce exclusivity and validation rejects missing/out-of-bound
   assert.equal(parseMapInput({ ...doc, title: 'Valid map' }).starts.length, 1);
   assert.throws(() => parseMapInput({ ...doc, title: 'Invalid', starts: [{ x: 200, y: 0 }] }), /outside/);
   assert.throws(() => parseMapInput({ ...doc, title: 'Invalid', gridData: {} }), /missing/);
+});
+test("windows are blocked, unknown cells stay review-walkable, and fire preserves existing terrain", () => {
+  assert.equal(isBlocked('unknown'), false);
+  assert.equal(isBlocked('window'), true);
+  assert.equal(isBlocked('empty'), false);
+  const doc: GridDocument = { gridWidth: 6, gridHeight: 6, gridData: { '2,2': 'wall', '3,3': 'empty' }, starts: [], exits: [], obstacles: [] };
+  const wallFire = applyTool(doc, 'fire', { x: 2, y: 2 });
+  assert.equal(wallFire.gridData['2,2'], 'wall');
+  assert.deepEqual(wallFire.obstacles, [{ x: 2, y: 2 }]);
+  assert.equal(applyTool(doc, 'fire', { x: 3, y: 3 }).gridData['3,3'], 'empty');
+});
+test("pre-check never connects through a blocked corner", () => {
+  const grid: GridDocument['gridData'] = {};
+  for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) grid[`${x},${y}`] = 'wall';
+  grid['1,1'] = 'empty'; grid['2,2'] = 'empty';
+  const doc: GridDocument = { gridWidth: 3, gridHeight: 3, gridData: grid, starts: [{ x: 1, y: 1 }], exits: [{ x: 2, y: 2 }], obstacles: [] };
+  assert.equal(inspectDocument(doc).unreachable.length, 1);
+  assert.equal(inspectDocument(doc, { allowDiagonal: true }).unreachable.length, 1);
 });

@@ -191,7 +191,7 @@ export const SAMPLE_MAPS: SampleMapRecord[] = [
     gridHeight: office.rows,
     gridData: office.grid,
     exits: [{ x: 3, y: 16 }, { x: 29, y: 16 }, { x: 24, y: 5 }],
-    starts: [{ x: 8, y: 8 }, { x: 14, y: 11 }],
+    starts: [{ x: 8, y: 7 }, { x: 14, y: 10 }],
     obstacles: [{ x: 24, y: 15 }],
     isPublic: true,
     createdAt: baseDate,

@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import navigation from "../../public/navigation.json";
 
 function current(path: string, href: string) {
@@ -10,6 +12,11 @@ function current(path: string, href: string) {
 export default function SiteHeader() {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    if (open) setOpen(false);
+  }
   const [signedIn, setSignedIn] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const button = useRef<HTMLButtonElement>(null);
@@ -60,7 +67,6 @@ export default function SiteHeader() {
       window.removeEventListener("safepath-menu-toggle", handleToggle);
     };
   }, []);
-  useEffect(() => { setOpen(false); }, [pathname]);
   const onToggle = (e: React.MouseEvent) => {
     (e.nativeEvent as any).__handledByReact = true;
     setOpen(v => !v);
@@ -88,7 +94,7 @@ export default function SiteHeader() {
   const accountHref = signedIn ? "/profile" : "/auth", accountText = signedIn ? "Account" : "Sign in";
   return <>
     <header className="site-header"><div className="site-header__inner">
-      <a className="site-brand" href="/" aria-label="SafePath home"><span className="site-brand__mark"><img src="/assets/logo.webp" alt="" width={34} height={34} /></span><span>SafePath</span></a>
+      <a className="site-brand" href="/" aria-label="SafePath home"><span className="site-brand__mark"><Image src="/assets/logo.webp" alt="" width={34} height={34} /></span><span>SafePath</span></a>
       <nav className="site-nav" aria-label="Primary navigation">{navigation.map(item => <a key={item.href} href={item.href} aria-current={current(pathname, item.href) ? "page" : undefined}>{item.label}</a>)}</nav>
       <a className="site-account" href={accountHref}>{accountText}</a>
       <button id="theme-toggle" className="site-theme-toggle" type="button" onClick={toggleTheme} aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"} title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}>
@@ -105,7 +111,7 @@ export default function SiteHeader() {
           <span className="theme-indicator">{theme === "light" ? "Light" : "Dark"}</span>
         </button>
         <a className="site-menu__account" href={accountHref}>{accountText}</a>
-        <a className="site-menu__action" href="/maps/new">Upload a floor plan</a>
+        <Link className="site-menu__action" href="/maps/new">Upload a floor plan</Link>
       </div>
     </div>
   </>;

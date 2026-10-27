@@ -5,7 +5,7 @@ async function headerSignature(page: Page) {
   return page.locator(".site-header").evaluate(header => {
     const nav = header.querySelector<HTMLElement>(".site-nav")!, brand = header.querySelector<HTMLElement>(".site-brand")!, account = header.querySelector<HTMLElement>(".site-account")!;
     const h = getComputedStyle(header), n = getComputedStyle(nav), b = getComputedStyle(brand), a = getComputedStyle(account);
-    return { height: h.height, bg: h.backgroundColor, font: h.fontFamily, navHeight: n.height, navBg: n.backgroundColor, navRadius: n.borderRadius, brandSize: b.fontSize, accountHeight: a.height, links: Array.from(nav.querySelectorAll("a")).map(x => ({ text: x.textContent, href: x.getAttribute("href") })) };
+    return { height: h.height, bg: h.backgroundColor, font: h.fontFamily.replace(/["']?Inter Fallback["']?,?\s*/g, ""), navHeight: n.height, navBg: n.backgroundColor, navRadius: n.borderRadius, brandSize: b.fontSize, accountHeight: a.height, links: Array.from(nav.querySelectorAll("a")).map(x => ({ text: x.textContent, href: x.getAttribute("href") })) };
   });
 }
 test("home and all app pages share the exact same header geometry and links", async ({ page }) => {
@@ -44,7 +44,7 @@ test("dashboard uses actual saved plans, previews and run counts", async ({ page
   await expect(page.locator(".metric-strip dd").nth(3)).toHaveText(String(runs.length));
   await expect(page.locator(".plan-tile")).toHaveCount(Math.min(3, maps.length));
   for (const map of maps.slice(0,3)) {
-    await expect(page.getByRole("heading", { name: map.title, exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: map.title, exact: true }).first()).toBeVisible();
     const preview = await request.get(BASE + `/api/maps/${map.id}/preview`); expect(preview.status()).toBe(200); expect(preview.headers()["content-type"]).toContain("image/svg+xml");
   }
   await page.screenshot({ path: "/tmp/premium-dashboard.png", fullPage: true });

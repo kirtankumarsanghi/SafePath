@@ -1,6 +1,6 @@
 import type { SavedMap, GridDocument } from "./map-model";
 import type { MapSummary } from "./workspace-client";
-import type { CellType, Point } from "./astar";
+import { isBlocked, type Point } from "./astar";
 
 const STORAGE_KEY = "safepath_custom_floorplans_v1";
 
@@ -110,18 +110,21 @@ export function toMapSummary(m: StoredCustomMap): MapSummary {
 }
 
 /**
- * Ensures any map has at least one valid start and exit, so A* can run immediately.
+ * Filters starts/exits to walkable cells. By default it also adds a fallback
+ * start and exit so a newly loaded map can run immediately; pass
+ * `{ addDefaults: false }` while editing an analyzed plan so no phantom
+ * people or exits are created.
  */
-export function ensureValidCoordinates(doc: GridDocument): { doc: GridDocument; addedDefault: boolean } {
+export function ensureValidCoordinates(doc: GridDocument, options: { addDefaults?: boolean } = {}): { doc: GridDocument; addedDefault: boolean } {
   let { starts, exits, gridData, gridWidth, gridHeight, obstacles } = doc;
+  const addDefaults = options.addDefaults ?? true;
   let added = false;
 
   const blockedObstacles = new Set((obstacles ?? []).map(p => `${p.x},${p.y}`));
   const isFree = (x: number, y: number) => {
     const k = `${x},${y}`;
-    const cell = gridData?.[k];
     return x >= 0 && y >= 0 && x < gridWidth && y < gridHeight &&
-      cell !== "wall" && cell !== "blocked" && cell !== "fire" && !blockedObstacles.has(k);
+      !isBlocked(gridData?.[k]) && !blockedObstacles.has(k);
   };
 
   // Only keep starts and exits that are currently on free, walkable cells
@@ -144,13 +147,13 @@ export function ensureValidCoordinates(doc: GridDocument): { doc: GridDocument; 
     }
   }
 
-  if (nextExits.length === 0 && freeCells.length > 0) {
+  if (addDefaults && nextExits.length === 0 && freeCells.length > 0) {
     const perimeterExit = freeCells.find(p => p.x <= 2 || p.x >= gridWidth - 3 || p.y <= 2 || p.y >= gridHeight - 3) || freeCells[freeCells.length - 1];
     nextExits.push(perimeterExit);
     added = true;
   }
 
-  if (nextStarts.length === 0 && freeCells.length > 0) {
+  if (addDefaults && nextStarts.length === 0 && freeCells.length > 0) {
     const exitKey = nextExits[0] ? `${nextExits[0].x},${nextExits[0].y}` : "";
     const startCandidate = freeCells.find(p => `${p.x},${p.y}` !== exitKey) || freeCells[0];
     if (startCandidate) {
