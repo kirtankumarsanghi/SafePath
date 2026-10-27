@@ -166,16 +166,15 @@ export async function uploadForAnalysis(
   if (!file.size) throw new Error("The selected file is empty.");
   if (file.size > 20 * 1024 * 1024) throw new Error("Use an image smaller than 20 MB.");
 
-  // If the file is > 4 MB (Vercel payload limit) or OCR is disabled,
-  // process directly in the browser canvas for instant 100ms conversion.
-  if (file.size > 4 * 1024 * 1024 || !ocr) {
+  // If the file is > 12 MB (server payload limit) or OCR is disabled,
+  // process directly in the browser canvas for instant conversion.
+  if (file.size > 12 * 1024 * 1024 || !ocr) {
     return analyzeFileInBrowser(file);
   }
 
-  // Attempt server analysis with a fast 5-second deadline so Vercel cold starts / slow OCR
-  // never leave the user waiting for minutes.
+  // Attempt server analysis with a 45-second deadline so multi-region OCR completes reliably.
   const serverController = new AbortController();
-  const serverTimer = setTimeout(() => serverController.abort(), 5000);
+  const serverTimer = setTimeout(() => serverController.abort(), 45000);
   const handleAbort = () => serverController.abort();
   signal?.addEventListener("abort", handleAbort, { once: true });
 
@@ -190,12 +189,18 @@ export async function uploadForAnalysis(
     });
 
     clearTimeout(serverTimer);
-    if (response.ok) {
-      const data = await response.json().catch(() => null);
-      if (data?.analysis) return data.analysis;
+    const data = await response.json().catch(() => null);
+    if (response.ok && data?.analysis) {
+      return data.analysis;
+    }
+    if (response.status >= 400 && response.status < 500 && response.status !== 429 && data?.error) {
+      throw new Error(data.error);
     }
   } catch (err) {
     if (signal?.aborted) throw err;
+    if (err instanceof Error && /could not be decoded|too small|larger than|Choose a PNG/i.test(err.message)) {
+      throw err;
+    }
   } finally {
     clearTimeout(serverTimer);
     signal?.removeEventListener("abort", handleAbort);

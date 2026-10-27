@@ -1,5 +1,5 @@
 import { isBlocked, type CellType, type Point } from "./astar";
-import { extractWallSegments, summarizeGridGraph } from "./map-topology";
+import { extractDoorCandidates, extractWallSegments, summarizeGridGraph } from "./map-topology";
 
 export interface Bounds { left: number; top: number; right: number; bottom: number }
 export type ReviewStatus = "CONFIRMED" | "NEEDS_REVIEW" | "UNDETECTED_OR_UNKNOWN";
@@ -108,15 +108,78 @@ export function validateConversionOptions(o: ConversionOptions): ConversionOptio
   for (const region of o.excludedRegions) validCrop(region);
   return o;
 }
-function hueName(r: number, g: number, b: number) {
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), spread = max - min;
-  if (spread < 44 || max < 80) return null;
-  if (r > g * 1.28 && r > b * 1.18) return g > b * 1.15 ? "orange/red" : "red";
-  if (g > r * 1.2 && g > b * .88) return "green";
-  if (b > r * 1.18 && b > g * 1.12) return "blue";
-  if (r > b * 1.1 && g > b * 1.08 && r > g * .82) return "yellow";
+
+export function rgbToHsv(r: number, g: number, b: number): { h: number; s: number; v: number; spread: number } {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const spread = max - min;
+  const v = max / 255;
+  const s = max === 0 ? 0 : spread / max;
+  if (spread === 0) return { h: 0, s: 0, v, spread: 0 };
+  let h = 0;
+  if (max === r) h = 60 * (((g - b) / spread) % 6);
+  else if (max === g) h = 60 * ((b - r) / spread + 2);
+  else h = 60 * ((r - g) / spread + 4);
+  if (h < 0) h += 360;
+  return { h, s, v, spread };
+}
+
+/**
+ * Classify a pixel's chromatic hue across the full HSV spectrum while ignoring
+ * neutral black, grey, dark sepia/blueprint wall ink, and off-white paper.
+ */
+export function hueName(r: number, g: number, b: number): string | null {
+  const { h, s, v, spread } = rgbToHsv(r, g, b);
+  // Ignore near-black ink, dark blueprint/charcoal strokes, near-white paper, and low-chroma grey tones
+  if (spread < 32 || v < 0.25) return null;
+  if (v < 0.34 && s < 0.48) return null;
+  if (s < 0.20 && spread < 44) return null;
+  // Filter faint warm/cool scanner paper tint when brightness is very high
+  if (v > 0.92 && s < 0.26) return null;
+
+  if (h >= 345 || h < 14) return "red";
+  if (h >= 14 && h < 42) {
+    if (v < 0.62 && r < 175 && b < 70) return "brown";
+    return "orange/red";
+  }
+  if (h >= 42 && h < 70) return "yellow";
+  if (h >= 70 && h < 166) return "green";
+  if (h >= 166 && h < 200) return "cyan/teal";
+  if (h >= 200 && h < 262) return "blue";
+  if (h >= 262 && h < 345) return "purple/magenta";
   return "colored";
 }
+
+function dominantBlobHue(image: PixelImage, bounds: Bounds, fallbackX: number, fallbackY: number): string {
+  const channels = image.channels ?? (image.data.length >= image.width * image.height * 4 ? 4 : 3);
+  const counts = new Map<string, number>();
+  const x0 = clamp(Math.floor(bounds.left * image.width), 0, image.width - 1);
+  const x1 = clamp(Math.ceil(bounds.right * image.width) - 1, 0, image.width - 1);
+  const y0 = clamp(Math.floor(bounds.top * image.height), 0, image.height - 1);
+  const y1 = clamp(Math.ceil(bounds.bottom * image.height) - 1, 0, image.height - 1);
+  const stepX = Math.max(1, Math.floor((x1 - x0 + 1) / 5));
+  const stepY = Math.max(1, Math.floor((y1 - y0 + 1) / 5));
+
+  for (let y = y0; y <= y1; y += stepY) {
+    for (let x = x0; x <= x1; x += stepX) {
+      const idx = (y * image.width + x) * channels;
+      const hue = hueName(image.data[idx], image.data[idx + 1], image.data[idx + 2]);
+      if (hue) counts.set(hue, (counts.get(hue) ?? 0) + 1);
+    }
+  }
+  let bestHue = "";
+  let bestCount = 0;
+  for (const [hue, c] of counts.entries()) {
+    if (c > bestCount) {
+      bestCount = c;
+      bestHue = hue;
+    }
+  }
+  if (bestHue) return bestHue;
+  const si = (Math.min(image.height - 1, Math.round(fallbackY)) * image.width + Math.min(image.width - 1, Math.round(fallbackX))) * channels;
+  return hueName(image.data[si], image.data[si + 1], image.data[si + 2]) ?? "colored";
+}
+
 function componentMask(image: PixelImage, stride: number, predicate: (r: number, g: number, b: number) => boolean, maxComponentShare: number) {
   const scale = Math.max(1, Math.ceil(Math.max(image.width, image.height) / stride)), w = Math.ceil(image.width / scale), h = Math.ceil(image.height / scale);
   const mask = new Uint8Array(w * h), seen = new Uint8Array(w * h), queue = new Int32Array(w * h), channels = image.channels ?? (image.data.length >= image.width * image.height * 4 ? 4 : 3);
@@ -129,7 +192,7 @@ function componentMask(image: PixelImage, stride: number, predicate: (r: number,
       for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, ni = ny * w + nx; if (nx < 0 || ny < 0 || nx >= w || ny >= h || seen[ni] || !mask[ni]) continue; seen[ni] = 1; queue[tail++] = ni; }
     }
     const bw = right - left + 1, bh = bottom - top + 1;
-    if (tail < Math.max(12, Math.round(w * h / 35000)) || tail > w * h * maxComponentShare || bw / bh > 8 || bh / bw > 8 || tail / (bw * bh) < .10) continue;
+    if (tail < Math.max(10, Math.round(w * h / 38000)) || tail > w * h * maxComponentShare || bw / bh > 9 || bh / bw > 9 || tail / (bw * bh) < .10) continue;
     blobs.push({ area: tail, bounds: { left: left / w, top: top / h, right: (right + 1) / w, bottom: (bottom + 1) / h }, sampleX: (left + right) / 2 * scale, sampleY: (top + bottom) / 2 * scale });
   }
   return blobs.sort((a, b) => b.area - a.area);
@@ -143,27 +206,138 @@ export function suggestedOptions(image: PixelImage): ConversionOptions {
   for (let i = 0; i < 255; i++) { leftCount += hist[i]; leftSum += i * hist[i]; const rightCount = count - leftCount; if (!leftCount || !rightCount) continue; const d = leftSum / leftCount - (sum - leftSum) / rightCount, variance = leftCount * rightCount * d * d; if (variance > bestVariance) { bestVariance = variance; cutoff = i; } }
   return { ...DEFAULT_CONVERSION, ...resolutionFor(image.width, image.height, 64), wallThreshold: clamp(cutoff + 30, 90, 205), invert: median < 105, crop: { ...FULL_BOUNDS } };
 }
+
+/**
+ * Clean common OCR character confusions in floor-plan signage (e.g. EX1T -> EXIT,
+ * STAlRS -> STAIRS, spaced E X I T -> EXIT) before semantic classification.
+ */
+export function normalizeOcrText(raw: string): string {
+  return raw
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\bE\s+X\s+I\s+T(\s+S)?\b/gi, "EXIT$1")
+    .replace(/\bS\s+T\s+A\s+I\s+R(\s+S)?\b/gi, "STAIR$1")
+    .replace(/\bF\s+I\s+R\s+E\b/gi, "FIRE")
+    .replace(/\bEX[1I!|l][T7](S)?\b/gi, "EXIT$1")
+    .replace(/\bEMER[G6C][EF]N[CG][YV]\b/gi, "EMERGENCY")
+    .replace(/\b[S5]TA[1I!|l]R([S5])?\b/gi, "STAIRS")
+    .replace(/\bF[1I!|l]RE\b/gi, "FIRE")
+    .replace(/\bEXT[1I!|l]NGU[1I!|l]SHER\b/gi, "EXTINGUISHER")
+    .replace(/\bEL[EF]VAT[0O]R\b/gi, "ELEVATOR")
+    .replace(/\bA[S5][S5]EM[B8]LY\b/gi, "ASSEMBLY")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function classifyLabel(text: string): LabelKind {
-  const t = text.toUpperCase().replace(/[^A-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-  if (/^(?:MAP )?(?:LEGEND|KEY|SYMBOLS|SYMBOL KEY|MAP KEY|MAP SYMBOLS|KEY TO SYMBOLS)$/.test(t)) return "legend";
-  if (/\b(NO EXIT|NOT AN EXIT|EXIT LEGEND|FIRE EXIT PLAN|EVACUATION PLAN|EVACUATION ROUTE|EXIT ROUTE|MAP EXIT KEY)\b/.test(t)) return "other";
-  if (/\b(FIRE HAZARD|ACTIVE FIRE|SMOKE AREA|FIRE AREA|FIRE LOCATION|FIRE INCIDENT)\b/.test(t) && !/EXTINGUISHER|ALARM|FIRE EXIT/.test(t)) return "hazard";
-  if (/\b(YOU ARE HERE|YOUR LOCATION|CURRENT LOCATION)\b/.test(t)) return "start";
-  if (/\b(FIRE )?EXTINGUISHER|\bHYDRANT\b|\bFIRE HOSE\b/.test(t)) return "equipment";
-  if (/\bFIRE ALARM\b|\bSMOKE DETECTOR\b|\bALARM\b/.test(t)) return "equipment";
-  if (/\bFIRST AID\b|\bAED\b/.test(t)) return "first-aid";
-  if (/\bASSEMBLY POINT\b|\bMUSTER POINT\b/.test(t)) return "assembly";
+  const t = normalizeOcrText(text)
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (/^(?:MAP )?(?:LEGEND|KEY|SYMBOLS|SYMBOL KEY|MAP KEY|MAP SYMBOLS|KEY TO SYMBOLS|LEGENDE|LEYENDA)$/.test(t)) return "legend";
+  if (/\b(NO EXIT|NOT AN EXIT|SIN SALIDA|PAS DE SORTIE|KEIN AUSGANG|NOODUITGANG NIET|EXIT LEGEND|FIRE EXIT PLAN|EVACUATION PLAN|EVACUATION ROUTE|EXIT ROUTE|MAP EXIT KEY)\b/.test(t)) return "other";
+  if (/\b(FIRE HAZARD|ACTIVE FIRE|SMOKE AREA|FIRE AREA|FIRE LOCATION|FIRE INCIDENT|DANGER FIRE|FLAMMABLE|HIGH VOLTAGE|BIOHAZARD)\b/.test(t) && !/EXTINGUISHER|ALARM|FIRE EXIT/.test(t)) return "hazard";
+  if (/\b(YOU ARE HERE|YOUR LOCATION|CURRENT LOCATION|START HERE|USTED ESTA AQUI|VOUS ETES ICI|SIE SIND HIER|VOCE ESTA AQUI)\b/.test(t)) return "start";
+  if (/\b(FIRE )?EXTINGUISHER|\bHYDRANT\b|\bFIRE HOSE\b|\bHOSE REEL\b|\bEXTINTOR\b|\bEXTINCTEUR\b|\bFEUERLOSCHER\b/.test(t)) return "equipment";
+  if (/\bFIRE ALARM\b|\bSMOKE DETECTOR\b|\bPULL STATION\b|\bALARM\b/.test(t)) return "equipment";
+  if (/\bFIRST AID\b|\bAED\b|\bDEFIBRILLATOR\b|\bMEDICAL KIT\b|\bPRIMEROS AUXILIOS\b/.test(t)) return "first-aid";
+  if (/\bASSEMBLY POINT\b|\bMUSTER POINT\b|\bEVACUATION ASSEMBLY\b|\bREFUGE AREA\b|\bPUNTO DE REUNION\b/.test(t)) return "assembly";
   if (/\bEVACUATION ARROW\b|\bEVACUATION ROUTE\b|\bEXIT ARROW\b/.test(t)) return "arrow";
   const sign = t.replace(/\s+/g, " ").replace(/EXIT(?=\d)/g, "EXIT ");
-  if (/^(?:(?:FIRE|EMERGENCY|FINAL|NORTH|SOUTH|EAST|WEST|MAIN|SIDE|REAR|FRONT|NEAREST|STAIR(?:S)?|LEVEL [0-9]) ){0,2}(?:EXIT|EXITS|EGRESS|SORTIE|SALIDA|WAY OUT)(?: (?:ONLY|DOOR|[0-9]{1,3}|[A-D]))?$/.test(sign)) return "exit";
-  if (/\b(STAIR|STAIRS|STAIRWELL)\b/.test(t)) return "stairs";
-  if (/\b(RAMP|ACCESSIBLE ROUTE)\b/.test(t)) return "ramp";
-  if (/\b(ELEVATOR|LIFT|ELEV)\b/.test(t)) return "elevator";
-  if (/\b(WINDOW|GLAZING)\b/.test(t)) return "window";
-  if (/\b(DOOR|DOORWAY|ENTRANCE|ENTRY)\b/.test(t)) return "door";
-  if (/\b(ROOM|CLASSROOM|LAB|LABORATORY|OFFICE|HALL|CORRIDOR|RECEPTION|WARD|LOBBY|STORE|TOILET|WC|KITCHEN|LIBRARY|BEDROOM|MEETING|CUBICLE|PATIENT)\b/.test(t)) return "room";
+  if (/^(?:(?:FIRE|EMERGENCY|FINAL|NORTH|SOUTH|EAST|WEST|MAIN|SIDE|REAR|FRONT|NEAREST|PRIMARY|SECONDARY|STAIR(?:S)?|LEVEL [0-9]|SALIDA DE|SORTIE DE) ){0,2}(?:EXIT|EXITS|EGRESS|SORTIE|SALIDA|SAIDA|EMERGENCIA|SECOURS|NOTAUSGANG|AUSGANG|USCITA|NOODUITGANG|WAY OUT|EMERGENCY DOOR|ESCAPE DOOR|FIRE DOOR)(?: (?:ONLY|DOOR|DE EMERGENCIA|DE SECOURS|[0-9]{1,3}|[A-F]))?$/.test(sign)) return "exit";
+  if (/\b(STAIR|STAIRS|STAIRWELL|STAIRCASE|FIRE STAIRS|ESCALERA|ESCALERAS|ESCALIER|TREPPE|TREPPENHAUS|ESCADA)\b/.test(t)) return "stairs";
+  if (/\b(RAMP|ACCESSIBLE ROUTE|WHEELCHAIR RAMP|RAMPA)\b/.test(t)) return "ramp";
+  if (/\b(ELEVATOR|LIFT|ELEV|ASCENSOR|ASCENSEUR|AUFZUG)\b/.test(t)) return "elevator";
+  if (/\b(WINDOW|GLAZING|SKYLIGHT|VENTANA|FENETRE)\b/.test(t)) return "window";
+  if (/\b(DOOR|DOORWAY|ENTRANCE|MAIN ENTRANCE|ENTRY|GATE|PUERTA|PORTE)\b/.test(t)) return "door";
+  if (/\b(ROOM|CLASSROOM|LAB|LABORATORY|OFFICE|HALL|HALLWAY|CORRIDOR|RECEPTION|WARD|LOBBY|STORE|STORAGE|TOILET|RESTROOM|WASHROOM|WC|KITCHEN|CAFETERIA|CANTEEN|LIBRARY|BEDROOM|MEETING|CONFERENCE|AUDITORIUM|LECTURE|GYM|CLINIC|PHARMACY|SERVER|ELECTRICAL|MECHANICAL|BOILER|FOYER|ATRIUM|LOUNGE|CUBICLE|PATIENT|NURSE|ARCHIVE|WORKSHOP)\b/.test(t)) return "room";
+  if (/^(?:RM|ROOM|R|LAB|OFF)\s*[0-9]{1,4}[A-Z]?$/.test(t)) return "room";
   return "other";
 }
+
+/**
+ * Recombine two-line vertically stacked or horizontally split OCR labels when their
+ * combined wording changes or refines the semantic meaning (e.g. "NO" + "EXIT" -> "NO EXIT",
+ * "YOU ARE" + "HERE" -> "YOU ARE HERE", "EMERGENCY" + "EXIT" -> "EMERGENCY EXIT").
+ */
+export function mergeStackedAndAdjacentLabels(labels: PlanLabel[]): PlanLabel[] {
+  if (labels.length < 2) return labels;
+  const used = new Uint8Array(labels.length);
+  const result: PlanLabel[] = [];
+
+  for (let i = 0; i < labels.length; i++) {
+    if (used[i]) continue;
+    const a = labels[i];
+    const ax = (a.box.left + a.box.right) / 2;
+    const ay = (a.box.top + a.box.bottom) / 2;
+    const ah = Math.max(0.005, a.box.bottom - a.box.top);
+    const aw = Math.max(0.005, a.box.right - a.box.left);
+    let merged: PlanLabel | null = null;
+
+    for (let j = 0; j < labels.length; j++) {
+      if (i === j || used[j]) continue;
+      const b = labels[j];
+      const bx = (b.box.left + b.box.right) / 2;
+      const by = (b.box.top + b.box.bottom) / 2;
+      const bh = Math.max(0.005, b.box.bottom - b.box.top);
+
+      // Vertically stacked: `b` is directly below `a` with aligned horizontal center
+      const verticallyStacked =
+        by > ay &&
+        b.box.top - a.box.bottom < Math.max(ah, bh) * 1.4 &&
+        b.box.top >= a.box.top &&
+        Math.abs(ax - bx) < Math.max(aw, b.box.right - b.box.left) * 0.65;
+
+      // Horizontally adjacent on the same line: `b` is immediately to the right of `a`
+      const horizontallyAdjacent =
+        bx > ax &&
+        b.box.left - a.box.right < Math.max(ah, bh) * 1.6 &&
+        b.box.left >= a.box.left &&
+        Math.abs(ay - by) < Math.max(ah, bh) * 0.6;
+
+      if (!verticallyStacked && !horizontallyAdjacent) continue;
+
+      const combinedText = normalizeOcrText(`${a.text} ${b.text}`);
+      const combinedKind = classifyLabel(combinedText);
+      const upperCombined = combinedText.toUpperCase();
+
+      // Merge when the pair forms a negation ("NO EXIT", "NOT AN EXIT", "SIN SALIDA")
+      // or upgrades/combines a compound safety phrase ("EMERGENCY EXIT", "YOU ARE HERE", "FIRE EXTINGUISHER", "ASSEMBLY POINT", "FIRST AID")
+      const isNegatedExit = /\b(NO EXIT|NOT AN EXIT|SIN SALIDA|PAS DE SORTIE|KEIN AUSGANG)\b/.test(upperCombined);
+      const isCompoundSafetyPhrase =
+        combinedKind !== "other" &&
+        (a.kind === "other" || b.kind === "other" || a.kind === combinedKind);
+
+      if (isNegatedExit || isCompoundSafetyPhrase) {
+        used[i] = 1;
+        used[j] = 1;
+        merged = {
+          text: combinedText,
+          confidence: Math.round((a.confidence + b.confidence) / 2),
+          scoreType: "tesseract-raw",
+          kind: combinedKind,
+          box: {
+            left: Math.min(a.box.left, b.box.left),
+            top: Math.min(a.box.top, b.box.top),
+            right: Math.max(a.box.right, b.box.right),
+            bottom: Math.max(a.box.bottom, b.box.bottom),
+          },
+        };
+        break;
+      }
+    }
+
+    if (merged) {
+      result.push(merged);
+    } else if (!used[i]) {
+      used[i] = 1;
+      result.push(a);
+    }
+  }
+  return result;
+}
+
 export function semanticClassForLabel(text: string, kind: LabelKind): SemanticClass {
   if (kind === "legend") return "LEGEND";
   if (kind === "exit") return "EXIT_SIGN";
@@ -178,7 +352,7 @@ export function semanticClassForLabel(text: string, kind: LabelKind): SemanticCl
   if (kind === "assembly") return "ASSEMBLY_POINT";
   if (kind === "arrow") return "EVACUATION_ARROW";
   if (kind === "room") return "ROOM_LABEL";
-  if (kind === "equipment") { const t = text.toUpperCase(); return /EXTINGUISHER|HYDRANT|FIRE HOSE/.test(t) ? "FIRE_EXTINGUISHER" : /ALARM|DETECTOR/.test(t) ? "FIRE_ALARM" : "UNKNOWN"; }
+  if (kind === "equipment") { const t = text.toUpperCase(); return /EXTINGUISHER|HYDRANT|FIRE HOSE|HOSE REEL/.test(t) ? "FIRE_EXTINGUISHER" : /ALARM|DETECTOR|PULL STATION/.test(t) ? "FIRE_ALARM" : "UNKNOWN"; }
   return "UNKNOWN";
 }
 function isLegendHeader(text: string) { return classifyLabel(text) === "legend"; }
@@ -196,27 +370,83 @@ export function detectLegendRegions(labels: PlanLabel[]): LegendRegion[] {
 }
 export function labelInLegend(box: Bounds, legends: LegendRegion[]) { return legends.find(region => { const x = (box.left + box.right) / 2, y = (box.top + box.bottom) / 2; return x >= region.bounds.left && x <= region.bounds.right && y >= region.bounds.top && y <= region.bounds.bottom; }) ?? null; }
 export function detectCandidates(image: PixelImage, labels: PlanLabel[], legends: LegendRegion[] = detectLegendRegions(labels)): PlanCandidate[] {
+  const mergedLabels = mergeStackedAndAdjacentLabels(labels);
   const candidates: PlanCandidate[] = [];
-  for (const [i, label] of labels.entries()) {
+  for (const [i, label] of mergedLabels.entries()) {
     const legend = labelInLegend(label.box, legends); label.legendId = legend?.id ?? null; label.semanticClass = legend ? "LEGEND" : semanticClassForLabel(label.text, label.kind); label.scoreType = "tesseract-raw";
     if (legend || (label.kind !== "exit" && label.kind !== "start" && label.kind !== "stairs")) continue;
     candidates.push({ id: `text-${i}`, kind: label.kind === "exit" ? "exit" : label.kind === "start" ? "start" : "stairs", semanticClass: label.kind === "exit" ? "EXIT_SIGN" : label.kind === "start" ? "START_MARKER" : "STAIRS", status: "NEEDS_REVIEW", label: label.text.trim(), source: "text", confidence: "text-match", engineScore: label.confidence, box: label.box, legendId: null, evidence: label.kind === "exit" ? `OCR read an exit-sign label (uncalibrated Tesseract engine score ${Math.round(label.confidence)} / 100). This is not proof that the nearest door is an actual, usable exit. Check the exact door in the source and place a provisional exit there.` : label.kind === "start" ? "The plan contains a ‘you are here’/location label. Verify the actual person location on the grid." : "Stairs are labeled in the source. Vertical floor connections are not modeled by this single-floor graph." });
   }
   const blobs = componentMask(image, 800, (r, g, b) => hueName(r, g, b) !== null, .045);
-  const channels = image.channels ?? (image.data.length >= image.width * image.height * 4 ? 4 : 3);
   for (const blob of blobs.slice(0, 50)) {
     const b = blob.bounds, legend = labelInLegend(b, legends); if (legend) continue;
-    const si = (Math.min(image.height - 1, Math.round(blob.sampleY)) * image.width + Math.min(image.width - 1, Math.round(blob.sampleX))) * channels;
-    const hue = hueName(image.data[si], image.data[si + 1], image.data[si + 2]) ?? "colored";
+    const hue = dominantBlobHue(image, b, blob.sampleX, blob.sampleY);
     if (candidates.some(c => c.source === "color" && Math.hypot((c.box.left + c.box.right) / 2 - (b.left + b.right) / 2, (c.box.top + c.box.bottom) / 2 - (b.top + b.bottom) / 2) < .025)) continue;
     if (candidates.some(c => c.source === "text" && (b.left + b.right) / 2 >= c.box.left - .01 && (b.left + b.right) / 2 <= c.box.right + .01 && (b.top + b.bottom) / 2 >= c.box.top - .015 && (b.top + b.bottom) / 2 <= c.box.bottom + .015)) continue;
     candidates.push({ id: `color-${candidates.length}`, kind: "annotation", semanticClass: "COLORED_ANNOTATION", status: "NEEDS_REVIEW", label: `${hue} color-only annotation`, evidence: `A ${hue} region was detected by color and connected-component geometry only. Color cannot identify an exit, arrow, assembly marker, alarm, extinguisher, active fire or wall. This annotation is excluded from the routing grid; inspect and correct its region manually.`, source: "color", confidence: "color-only", engineScore: undefined, box: b, legendId: null });
   }
   return candidates.slice(0, 80);
 }
-function intersectsCellRun(mask: Uint8Array, w: number, h: number, horizontal: Uint8Array, vertical: Uint8Array, minH: number, minV: number) {
+function intersectsCellRun(mask: Uint8Array, w: number, h: number, horizontal: Uint8Array, vertical: Uint8Array, diagonal: Uint8Array, minH: number, minV: number) {
+  // Bridge 1-pixel anti-aliasing dropouts along orthogonal lines without closing real doorway gaps (>= 3px)
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    for (let x = 1; x < w - 1; x++) {
+      if (!mask[row + x] && mask[row + x - 1] && mask[row + x + 1]) mask[row + x] = 1;
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let y = 1; y < h - 1; y++) {
+      const i = y * w + x;
+      if (!mask[i] && mask[i - w] && mask[i + w]) mask[i] = 1;
+    }
+  }
   for (let y = 0; y < h; y++) { let from = -1; for (let x = 0; x <= w; x++) { const at = x < w && mask[y * w + x] ? 1 : 0; if (at && from < 0) from = x; else if (!at && from >= 0) { if (x - from >= minH) for (let xx = from; xx < x; xx++) horizontal[y * w + xx] = 1; from = -1; } } }
   for (let x = 0; x < w; x++) { let from = -1; for (let y = 0; y <= h; y++) { const at = y < h && mask[y * w + x] ? 1 : 0; if (at && from < 0) from = y; else if (!at && from >= 0) { if (y - from >= minV) for (let yy = from; yy < y; yy++) vertical[yy * w + x] = 1; from = -1; } } }
+
+  // Detect +45° and -45° diagonal architectural wall runs
+  const minD = Math.max(12, Math.min(minH, minV));
+  for (let start = 0; start < w + h - 1; start++) {
+    // Down-right diagonals (x - y = const)
+    let x0 = start < w ? start : 0;
+    let y0 = start < w ? 0 : start - w + 1;
+    let run = 0;
+    while (x0 < w && y0 < h) {
+      if (mask[y0 * w + x0]) {
+        run++;
+      } else {
+        if (run >= minD) {
+          for (let k = 1; k <= run; k++) diagonal[(y0 - k) * w + (x0 - k)] = 1;
+        }
+        run = 0;
+      }
+      x0++;
+      y0++;
+    }
+    if (run >= minD) {
+      for (let k = 1; k <= run; k++) diagonal[(y0 - k) * w + (x0 - k)] = 1;
+    }
+
+    // Down-left diagonals (x + y = const)
+    let x1 = start < w ? start : w - 1;
+    let y1 = start < w ? 0 : start - w + 1;
+    run = 0;
+    while (x1 >= 0 && y1 < h) {
+      if (mask[y1 * w + x1]) {
+        run++;
+      } else {
+        if (run >= minD) {
+          for (let k = 1; k <= run; k++) diagonal[(y1 - k) * w + (x1 + k)] = 1;
+        }
+        run = 0;
+      }
+      x1--;
+      y1++;
+    }
+    if (run >= minD) {
+      for (let k = 1; k <= run; k++) diagonal[(y1 - k) * w + (x1 + k)] = 1;
+    }
+  }
 }
 function localIntegral(data: Uint8Array, w: number, h: number) {
   const stride = w + 1, sum = new Float64Array((w + 1) * (h + 1));
@@ -230,24 +460,35 @@ export function convertPixels(image: PixelImage, options: ConversionOptions, lab
   if (!Number.isInteger(image.width) || !Number.isInteger(image.height) || image.width < 1 || image.height < 1 || image.data.length < image.width * image.height * 3) throw new Error("The pixel raster is invalid or truncated.");
   const crop = options.crop, cols = Math.round(options.cols), rows = Math.round(options.rows), x0 = Math.floor(crop.left * image.width), y0 = Math.floor(crop.top * image.height), w = Math.max(1, Math.ceil(crop.right * image.width) - x0), h = Math.max(1, Math.ceil(crop.bottom * image.height) - y0);
   const channels = image.channels ?? (image.data.length >= image.width * image.height * 4 ? 4 : 3);
-  const grey = new Uint8Array(w * h), colored = new Uint8Array(w * h), excluded = new Uint8Array(w * h), ink = new Uint8Array(w * h), textMask = new Uint8Array(w * h);
+  const grey = new Uint8Array(w * h), colored = new Uint8Array(w * h), excluded = new Uint8Array(w * h), rawInk = new Uint8Array(w * h), ink = new Uint8Array(w * h), textMask = new Uint8Array(w * h);
   for (const region of options.excludedRegions) {
     const left = clamp(Math.floor(region.left * image.width) - x0, 0, w), right = clamp(Math.ceil(region.right * image.width) - x0, 0, w), top = clamp(Math.floor(region.top * image.height) - y0, 0, h), bottom = clamp(Math.ceil(region.bottom * image.height) - y0, 0, h);
     for (let yy = top; yy < bottom; yy++) for (let xx = left; xx < right; xx++) excluded[yy * w + xx] = 1;
   }
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const source = ((y + y0) * image.width + x + x0) * channels, i = y * w + x, alpha = channels === 4 ? image.data[source + 3] / 255 : 1, r = image.data[source] * alpha + 255 * (1 - alpha), g = image.data[source + 1] * alpha + 255 * (1 - alpha), b = image.data[source + 2] * alpha + 255 * (1 - alpha); grey[i] = Math.round(.299 * r + .587 * g + .114 * b); colored[i] = hueName(r, g, b) ? 1 : 0; }
-  if (options.ignoreText) for (const label of labels) { if (label.confidence < 50) continue; const left = clamp(Math.floor(label.box.left * image.width) - x0, 0, w), right = clamp(Math.ceil(label.box.right * image.width) - x0, 0, w), top = clamp(Math.floor(label.box.top * image.height) - y0, 0, h), bottom = clamp(Math.ceil(label.box.bottom * image.height) - y0, 0, h); for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) textMask[y * w + x] = 1; }
+  if (options.ignoreText) for (const label of labels) { if (label.confidence < 48) continue; const left = clamp(Math.floor(label.box.left * image.width) - x0, 0, w), right = clamp(Math.ceil(label.box.right * image.width) - x0, 0, w), top = clamp(Math.floor(label.box.top * image.height) - y0, 0, h), bottom = clamp(Math.ceil(label.box.bottom * image.height) - y0, 0, h); for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) textMask[y * w + x] = 1; }
   const sum = localIntegral(grey, w, h), stride = w + 1, minCell = Math.max(3, Math.min(w / cols, h / rows)), radius = Math.max(9, Math.min(46, Math.round(minCell * 1.15)));
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; if (textMask[i]) continue; const xA = Math.max(0, x - radius), yA = Math.max(0, y - radius), xB = Math.min(w, x + radius + 1), yB = Math.min(h, y + radius + 1), mean = meanIn(sum, stride, xA, yA, xB, yB), lum = grey[i]; const adaptive = options.invert ? lum > mean + Math.max(7, (255 - mean) * .035) : lum < mean - Math.max(7, mean * .035); const global = options.invert ? lum > options.wallThreshold : lum < options.wallThreshold; ink[i] = (global || adaptive) && !colored[i] ? 1 : 0; }
-  const hLines = new Uint8Array(w * h), vLines = new Uint8Array(w * h), cellW = w / cols, cellH = h / rows;
-  // Long but not page-wide continuous components provide architectural line evidence.
-  intersectsCellRun(ink, w, h, hLines, vLines, Math.max(12, Math.round(cellW * .8)), Math.max(12, Math.round(cellH * .8)));
-  const size = cols * rows, total = new Uint32Array(size), dark = new Uint32Array(size), annotations = new Uint32Array(size), excludedCounts = new Uint32Array(size), hHits = new Uint32Array(size), vHits = new Uint32Array(size), grid: Record<string, CellType> = {}, cellEvidence: Record<string, CellEvidence> = {};
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const cell = Math.min(rows - 1, Math.floor(y * rows / h)) * cols + Math.min(cols - 1, Math.floor(x * cols / w)), i = y * w + x; total[cell]++; if (colored[i]) annotations[cell]++; if (excluded[i]) excludedCounts[cell]++; if (!ink[i]) continue; if (options.denoise && !hLines[i] && !vLines[i] && x > 0 && x < w - 1 && y > 0 && y < h - 1) { let near = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && ink[(y + dy) * w + x + dx]) near++; if (near <= 1) continue; } dark[cell]++; if (hLines[i]) hHits[cell]++; if (vLines[i]) vHits[cell]++; }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x;
+    if (colored[i]) continue;
+    const xA = Math.max(0, x - radius), yA = Math.max(0, y - radius), xB = Math.min(w, x + radius + 1), yB = Math.min(h, y + radius + 1);
+    const mean = meanIn(sum, stride, xA, yA, xB, yB), lum = grey[i];
+    const adaptive = options.invert ? lum > mean + Math.max(7, (255 - mean) * .035) : lum < mean - Math.max(7, mean * .035);
+    const global = options.invert ? lum > options.wallThreshold : lum < options.wallThreshold;
+    rawInk[i] = global || adaptive ? 1 : 0;
+  }
+  const hLines = new Uint8Array(w * h), vLines = new Uint8Array(w * h), dLines = new Uint8Array(w * h), cellW = w / cols, cellH = h / rows;
+  // Detect long architectural wall runs (orthogonal and diagonal) before applying OCR text masks so walls crossing behind room labels remain intact.
+  intersectsCellRun(rawInk, w, h, hLines, vLines, dLines, Math.max(12, Math.round(cellW * .8)), Math.max(12, Math.round(cellH * .8)));
+  for (let i = 0; i < w * h; i++) {
+    ink[i] = rawInk[i] && (!textMask[i] || hLines[i] || vLines[i] || dLines[i]) ? 1 : 0;
+  }
+  const size = cols * rows, total = new Uint32Array(size), dark = new Uint32Array(size), annotations = new Uint32Array(size), excludedCounts = new Uint32Array(size), hHits = new Uint32Array(size), vHits = new Uint32Array(size), dHits = new Uint32Array(size), grid: Record<string, CellType> = {}, cellEvidence: Record<string, CellEvidence> = {};
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const cell = Math.min(rows - 1, Math.floor(y * rows / h)) * cols + Math.min(cols - 1, Math.floor(x * cols / w)), i = y * w + x; total[cell]++; if (colored[i]) annotations[cell]++; if (excluded[i]) excludedCounts[cell]++; if (!ink[i]) continue; if (options.denoise && !hLines[i] && !vLines[i] && !dLines[i] && x > 0 && x < w - 1 && y > 0 && y < h - 1) { let near = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && ink[(y + dy) * w + x + dx]) near++; if (near <= 1) continue; } dark[cell]++; if (hLines[i]) hHits[cell]++; if (vLines[i]) vHits[cell]++; if (dLines[i]) dHits[cell]++; }
   let walls = 0, unknown = 0, uncertainCells = 0; const cropLeft = x0, cropTop = y0;
   for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
-    const i = cy * cols + cx, key = `${cx},${cy}`, denominator = Math.max(1, total[i]), wallCoverage = dark[i] / denominator, annotationCoverage = annotations[i] / denominator, excludedCoverage = excludedCounts[i] / denominator, horizontal = hHits[i] / Math.max(1, cellW), vertical = vHits[i] / Math.max(1, cellH);
-    const strongWall = wallCoverage >= options.wallCoverage || horizontal >= .52 || vertical >= .52;
+    const i = cy * cols + cx, key = `${cx},${cy}`, denominator = Math.max(1, total[i]), wallCoverage = dark[i] / denominator, annotationCoverage = annotations[i] / denominator, excludedCoverage = excludedCounts[i] / denominator, horizontal = hHits[i] / Math.max(1, cellW), vertical = vHits[i] / Math.max(1, cellH), diagonal = dHits[i] / Math.max(1, Math.min(cellW, cellH));
+    const strongWall = wallCoverage >= options.wallCoverage || horizontal >= .52 || vertical >= .52 || diagonal >= .55;
     const ambiguousInk = !strongWall && wallCoverage >= Math.max(.025, options.wallCoverage * .34);
     const atFrame = cx === 0 || cy === 0 || cx === cols - 1 || cy === rows - 1;
     const annotationUnknown = annotationCoverage >= options.annotationCoverage;
@@ -255,11 +496,11 @@ export function convertPixels(image: PixelImage, options: ConversionOptions, lab
     const type: CellType = strongWall ? "wall" : annotationUnknown || ambiguousInk || atFrame || legendExcluded ? "unknown" : "empty";
     grid[key] = type; if (type === "wall") walls++; if (type === "unknown") unknown++;
     const cellBox: Bounds = { left: cx / cols, top: cy / rows, right: (cx + 1) / cols, bottom: (cy + 1) / rows };
-    const evidence = [horizontal >= .52 ? "long-horizontal-line" : "", vertical >= .52 ? "long-vertical-line" : "", wallCoverage >= options.wallCoverage ? "wall-pixel-occupancy-above-review-threshold" : "", annotationUnknown ? "colored-annotation-not-semantically-interpreted" : "", legendExcluded ? "legend-or-user-excluded-region" : "", atFrame ? "image-edge-is-not-assumed-walkable" : "", ambiguousInk ? "partial-ink-needs-human-review" : ""].filter(Boolean);
+    const evidence = [horizontal >= .52 ? "long-horizontal-line" : "", vertical >= .52 ? "long-vertical-line" : "", diagonal >= .55 ? "long-diagonal-line" : "", wallCoverage >= options.wallCoverage ? "wall-pixel-occupancy-above-review-threshold" : "", annotationUnknown ? "colored-annotation-not-semantically-interpreted" : "", legendExcluded ? "legend-or-user-excluded-region" : "", atFrame ? "image-edge-is-not-assumed-walkable" : "", ambiguousInk ? "partial-ink-needs-human-review" : ""].filter(Boolean);
     if (ambiguousInk || (wallCoverage > 0 && Math.abs(wallCoverage - options.wallCoverage) < .08)) uncertainCells++;
     cellEvidence[key] = { type: type === "wall" ? "WALL" : type === "unknown" ? "UNKNOWN" : "WALKABLE_CANDIDATE", status: "NEEDS_REVIEW", sourcePixels: { left: cropLeft + Math.floor(cellBox.left * w), top: cropTop + Math.floor(cellBox.top * h), right: cropLeft + Math.ceil(cellBox.right * w), bottom: cropTop + Math.ceil(cellBox.bottom * h) }, darkCoverage: Number(wallCoverage.toFixed(4)), annotationCoverage: Number(annotationCoverage.toFixed(4)), excludedCoverage: Number(excludedCoverage.toFixed(4)), horizontalLineCoverage: Number(horizontal.toFixed(3)), verticalLineCoverage: Number(vertical.toFixed(3)), evidence: evidence.length ? evidence : ["low-contrast-with-detected-wall-strokes; still requires comparison with the source"], scoreType: "measured-pixel-coverage-not-probability" };
   }
-  const region = countRegions(grid, cols, rows), graph = summarizeGridGraph(grid, cols, rows), wallSegments = extractWallSegments(grid, cols, rows, crop, image.width, image.height), warnings: string[] = [];
+  const region = countRegions(grid, cols, rows), graph = summarizeGridGraph(grid, cols, rows), wallSegments = extractWallSegments(grid, cols, rows, crop, image.width, image.height), doorCandidates = extractDoorCandidates(grid, cols, rows, crop), warnings: string[] = [];
   if (walls < size * .012) warnings.push("Few definite wall cells were extracted. Pale regions are only walkable candidates. Check contrast and hand-draw walls from the source.");
   if (walls > size * .62) warnings.push("Most cells are classified as walls. Try another threshold or polarity and compare each result against the source.");
   if (unknown) warnings.push(`${unknown} grid cells are unknown (image edge, colored annotation, legend exclusion, or ambiguous line evidence); unknown cells remain walkable candidates and should be reviewed.`);
@@ -277,7 +518,7 @@ export function convertPixels(image: PixelImage, options: ConversionOptions, lab
     { id: "door-exit-verification", status: "REVIEW", message: "Door openings and usable exits are not inferred from a missing wall pixel or a sign alone. Confirm each passage and actual door on the source." },
     { id: "floor-connections", status: "REVIEW", message: "This upload is one floor. Stairs/elevators do not create vertical connections; analyze each floor separately." },
   ];
-  return { grid, cols, rows, walls, walkable: counts.WALKABLE_CANDIDATE, unknown, regions: region.count, largestRegion: region.largest, uncertainCells, warnings, counts, cellEvidence, wallSegments, doorCandidates: [], navigationGraph: graph, transform: { sourceWidth: image.width, sourceHeight: image.height, normalizedSourceWidth: image.width, normalizedSourceHeight: image.height, crop: { ...crop }, cols, rows, cellToImage: "pixel-bounds-derived-from-crop-and-grid-dimensions" }, validation: checks };
+  return { grid, cols, rows, walls, walkable: counts.WALKABLE_CANDIDATE, unknown, regions: region.count, largestRegion: region.largest, uncertainCells, warnings, counts, cellEvidence, wallSegments, doorCandidates, navigationGraph: graph, transform: { sourceWidth: image.width, sourceHeight: image.height, normalizedSourceWidth: image.width, normalizedSourceHeight: image.height, crop: { ...crop }, cols, rows, cellToImage: "pixel-bounds-derived-from-crop-and-grid-dimensions" }, validation: checks };
 }
 export function countRegions(grid: Record<string, CellType>, cols: number, rows: number) { const seen = new Uint8Array(cols * rows), queue = new Int32Array(cols * rows); let count = 0, largest = 0; for (let i = 0; i < seen.length; i++) { if (seen[i] || isBlocked(grid[`${i % cols},${Math.floor(i / cols)}`])) continue; let head = 0, tail = 1; queue[0] = i; seen[i] = 1; count++; while (head < tail) { const n = queue[head++], x = n % cols, y = Math.floor(n / cols); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, ni = ny * cols + nx; if (nx < 0 || ny < 0 || nx >= cols || ny >= rows || seen[ni] || isBlocked(grid[`${nx},${ny}`])) continue; seen[ni] = 1; queue[tail++] = ni; } } largest = Math.max(largest, tail); } return { count, largest }; }
 export function pixelsForBounds(bounds: Bounds, options: ConversionOptions, sourceWidth: number, sourceHeight: number) {
@@ -309,9 +550,29 @@ export function semanticCounts(objects: PlanObject[], legends: LegendRegion[]) {
 export function candidatePosition(candidate: PlanCandidate, options: ConversionOptions, grid: Record<string, CellType>): Point | null {
   const crop = options.crop, x = ((candidate.box.left + candidate.box.right) / 2 - crop.left) / (crop.right - crop.left), y = ((candidate.box.top + candidate.box.bottom) / 2 - crop.top) / (crop.bottom - crop.top);
   if (x < 0 || y < 0 || x >= 1 || y >= 1) return null;
-  const cx = Math.floor(x * options.cols), cy = Math.floor(y * options.rows), choices: (Point & { d: number })[] = [];
-  for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) { const px = cx + dx, py = cy + dy; if (px >= 0 && py >= 0 && px < options.cols && py < options.rows && !isBlocked(grid[`${px},${py}`])) choices.push({ x: px, y: py, d: dx * dx + dy * dy }); }
-  choices.sort((a, b) => a.d - b.d); return choices[0] ? { x: choices[0].x, y: choices[0].y } : null;
+  const cols = options.cols, rows = options.rows;
+  const cx = Math.floor(x * cols), cy = Math.floor(y * rows);
+  if (cx >= 0 && cy >= 0 && cx < cols && cy < rows && !isBlocked(grid[`${cx},${cy}`])) {
+    // Check if the direct cell has at least one walkable neighbor so we don't snap into a 1-cell wall cavity
+    const hasWalkableNeighbor = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => {
+      const nx = cx + dx, ny = cy + dy;
+      return nx >= 0 && ny >= 0 && nx < cols && ny < rows && !isBlocked(grid[`${nx},${ny}`]);
+    });
+    if (hasWalkableNeighbor) return { x: cx, y: cy };
+  }
+  const choices: (Point & { d: number; hasNeighbor: boolean })[] = [];
+  for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+    const px = cx + dx, py = cy + dy;
+    if (px >= 0 && py >= 0 && px < cols && py < rows && !isBlocked(grid[`${px},${py}`])) {
+      const hasNeighbor = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([nx, ny]) => {
+        const qx = px + nx, qy = py + ny;
+        return qx >= 0 && qy >= 0 && qx < cols && qy < rows && !isBlocked(grid[`${qx},${qy}`]);
+      });
+      choices.push({ x: px, y: py, d: dx * dx + dy * dy, hasNeighbor });
+    }
+  }
+  choices.sort((a, b) => (a.hasNeighbor !== b.hasNeighbor ? (a.hasNeighbor ? -1 : 1) : a.d - b.d));
+  return choices[0] ? { x: choices[0].x, y: choices[0].y } : null;
 }
 
 export function validationFor(
@@ -333,4 +594,3 @@ export function validationFor(
     { id: "ocr-language", status: "REVIEW" as const, message: labels.length ? "English OCR engine scores are uncalibrated text-recognition measures, not semantic confidence or proof." : "No text was confidently read. Verify labels and legends manually.", count: labels.length },
   ];
 }
-

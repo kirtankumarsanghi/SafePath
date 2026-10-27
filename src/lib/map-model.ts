@@ -1,14 +1,15 @@
-import { isBlocked, pointKey, samePoint, type CellType, type Point } from "./astar";
+import { isBlocked, pointKey, samePoint, type CellType, type ConnectorLink, type Point } from "./astar";
 import { validateConversionOptions, type SavedAnalysis } from "./map-analysis";
 export interface GridDocument {
   gridWidth: number; gridHeight: number; gridData: Record<string, CellType>;
   starts: Point[]; exits: Point[]; obstacles: Point[];
+  connectors?: ConnectorLink[];
 }
 export interface SavedMap extends GridDocument {
   id: number; title: string; description: string | null; imageUrl: string | null; sourceImage: string | null;
   analysis: SavedAnalysis | null; updatedAt?: string;
 }
-export type EditTool = "person" | "exit" | "wall" | "fire" | "floor" | "blocked" | "erase";
+export type EditTool = "person" | "exit" | "wall" | "fire" | "floor" | "blocked" | "erase" | "smoke" | "crowd" | "stairs";
 export function cleanTerrain(grid: Record<string, CellType> | string | undefined | null): Record<string, CellType> {
   if (!grid) return {};
   const g = typeof grid === "string" ? (() => { try { return JSON.parse(grid); } catch { return {}; } })() : grid;
@@ -28,7 +29,14 @@ export function applyTool(doc: GridDocument, tool: EditTool, p: Point): GridDocu
   }
   const removeAnchors = tool === "wall" || tool === "blocked" || tool === "erase";
   const obstacles = doc.obstacles.filter(q => !samePoint(q, p));
-  const terrain: CellType = tool === "wall" ? "wall" : tool === "blocked" ? "blocked" : tool === "fire" ? doc.gridData[k] ?? "empty" : "empty";
+  const terrain: CellType =
+    tool === "wall" ? "wall"
+    : tool === "blocked" ? "blocked"
+    : tool === "smoke" ? "smoke"
+    : tool === "crowd" ? "crowd"
+    : tool === "stairs" ? "stairs"
+    : tool === "fire" ? doc.gridData[k] ?? "empty"
+    : "empty";
   return {
     ...doc,
     gridData: { ...doc.gridData, [k]: terrain },
@@ -64,7 +72,7 @@ export function inspectDocument(doc: GridDocument, options: { allowDiagonal?: bo
 }
 export class MapInputError extends Error {}
 const fail = (message: string): never => { throw new MapInputError(message); };
-const TYPES = new Set(["empty", "wall", "exit", "start", "obstacle", "fire", "blocked", "unknown", "door", "window"]);
+const TYPES = new Set(["empty", "wall", "exit", "start", "obstacle", "fire", "blocked", "unknown", "door", "window", "smoke", "crowd", "stairs"]);
 /** Validate all coordinates and JSON shapes before a map reaches PostgreSQL or A*. */
 export function parseMapInput(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail("Send a map object.");
@@ -109,13 +117,10 @@ export function parseMapInput(value: unknown) {
     }
     const value = (rawVal as string).trim();
     if (value.length > maxLength) fail(`${field} is too large. Re-upload a smaller image.`);
-    // Maps loaded from the API carry the served image endpoint rather than the
-    // base64 payload, so both forms are valid input.
     if (/^\/api\/maps\/\d+\/(?:image|preview)(?:\?.*)?$/.test(value)) return null;
     if (value.startsWith("data:image/")) return value;
     return null;
   };
-  // `null` here means "keep whatever the server already stores".
   const imageUrl = dataImage("imageUrl", 8_000_000), sourceImage = dataImage("sourceImage", 16_900_000);
   const analysis = b.analysis as SavedAnalysis | null | undefined;
   if (analysis) {

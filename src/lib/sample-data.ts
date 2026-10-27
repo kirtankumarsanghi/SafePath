@@ -1,4 +1,5 @@
-import { runEvacuation, type CellType, type Point } from "./astar";
+import { runEvacuation, type AStarRunResult, type CellType, type NodeValues, type Point } from "./astar";
+import type { SavedAnalysis } from "./map-analysis";
 
 type Grid = Record<string, CellType>;
 
@@ -133,25 +134,33 @@ export interface SampleMapRecord {
   sourceImage: string | null;
   hasImage?: boolean;
   hasSource?: boolean;
-  analysis?: any;
+  analysis?: Partial<SavedAnalysis> | null;
+}
+
+export interface SampleRunPathResult {
+  path?: Point[];
+  explored?: Point[];
+  fValues?: Record<string, NodeValues>;
+  people?: AStarRunResult[];
+  allReached?: boolean;
 }
 
 export interface SampleRunRecord {
   id: number;
   userId: number;
-  mapId: number;
+  mapId: number | null;
   title: string;
   heuristic: string;
   startPoints: Point[];
   exitPoints: Point[];
   obstaclePoints: Point[];
-  pathResult: any;
+  pathResult: SampleRunPathResult | AStarRunResult[];
   totalPathCost: number | null;
   nodesExplored: number;
   nodesInOpen: number;
   nodesInClosed: number;
   timeTakenMs: number;
-  config: any;
+  config: Record<string, unknown>;
   createdAt: string;
 }
 

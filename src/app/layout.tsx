@@ -9,6 +9,21 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"], 
 export const metadata: Metadata = {
   title: "SafePath — Floor-plan evacuation planning",
   description: "Upload a building plan, review doors and exits, and explore candidate routes with the A* search algorithm.",
+  keywords: ["evacuation planning", "A* pathfinding", "floor plan analysis", "algorithm visualization", "egress simulation", "computer vision", "Next.js"],
+  authors: [{ name: "Kirtan Sanghi" }],
+  openGraph: {
+    title: "SafePath — Floor-plan evacuation planning & A* simulator",
+    description: "Turn an architectural floor plan into a reviewable grid and step through multi-occupant, multi-exit A* evacuation paths.",
+    type: "website",
+    siteName: "SafePath",
+    images: [{ url: "/assets/logo.webp", width: 256, height: 256, alt: "SafePath Logo" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SafePath — Floor-plan evacuation planning & A* simulator",
+    description: "Upload a building plan, review doors and exits, and explore candidate routes with the A* search algorithm.",
+    images: ["/assets/logo.webp"],
+  },
 };
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

@@ -2,40 +2,56 @@ import { NextRequest, NextResponse } from "next/server";
 import { db, ensureDatabaseReady, isDatabaseConfigured } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { comparePassword, signToken } from "@/lib/auth";
+import { attachAuthCookie, comparePassword, signToken } from "@/lib/auth";
+import { checkRateLimit, clientKeyFromHeaders } from "@/lib/rate-limit";
+import { validateLoginInput } from "@/lib/api-validation";
+import { reportServerError } from "@/lib/monitoring";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    if (typeof body.email !== "string" || typeof body.password !== "string" || body.email.length > 255 || body.password.length > 128 || !body.password) {
-      return NextResponse.json({ error: "Enter your email and password." }, { status: 400 });
+    const rate = checkRateLimit(clientKeyFromHeaders(req.headers, "auth:login"), 25, 60_000);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many sign-in attempts. Please wait a moment and try again.", code: "RATE_LIMITED" },
+        { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } }
+      );
     }
-    const email = body.email.trim().toLowerCase();
+
+    const body = await req.json();
+    const parsed = validateLoginInput(body);
+    if (!parsed.ok) {
+      return NextResponse.json({ error: parsed.error, code: parsed.code }, { status: 400 });
+    }
+    const { email, password } = parsed.data;
 
     if (isDatabaseConfigured) {
       await ensureDatabaseReady();
       const [user] = await db.select().from(users).where(eq(users.email, email));
-      if (!user || !(await comparePassword(body.password, user.passwordHash))) {
-        return NextResponse.json({ error: "The email or password is incorrect." }, { status: 401 });
+      if (!user || !(await comparePassword(password, user.passwordHash))) {
+        return NextResponse.json({ error: "The email or password is incorrect.", code: "INVALID_CREDENTIALS" }, { status: 401 });
       }
       const token = signToken({ userId: user.id, email: user.email });
-      return NextResponse.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+      const res = NextResponse.json({ token, user: { id: user.id, email: user.email, name: user.name } });
+      return attachAuthCookie(res, token);
     }
 
-    // Demo mode login: accept demo credentials
-    if (email === "demo@university.edu" && body.password === "demo123") {
+    const demoAllowed = process.env.ENABLE_DEMO_LOGIN !== "false";
+    const expectedDemoPassword = process.env.DEMO_ADMIN_PASSWORD || "demo123";
+    if (demoAllowed && email === "demo@university.edu" && password === expectedDemoPassword) {
       const token = signToken({ userId: 1, email: "demo@university.edu" });
-      return NextResponse.json({
+      const res = NextResponse.json({
         token,
         user: { id: 1, email: "demo@university.edu", name: "Demo Administrator" },
       });
+      return attachAuthCookie(res, token);
     }
 
     return NextResponse.json(
-      { error: "Database not connected. In demo mode, sign in with demo@university.edu / demo123, or configure DATABASE_URL in Vercel." },
+      { error: "Database not connected. Configure DATABASE_URL to sign in with a registered account.", code: "DB_UNCONFIGURED" },
       { status: 401 }
     );
-  } catch {
-    return NextResponse.json({ error: "Sign-in could not be completed. Please try again." }, { status: 500 });
+  } catch (err) {
+    reportServerError("/api/auth/login", err);
+    return NextResponse.json({ error: "Sign-in could not be completed. Please try again.", code: "INTERNAL_ERROR" }, { status: 500 });
   }
 }

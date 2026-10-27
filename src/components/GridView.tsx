@@ -43,6 +43,9 @@ export default function GridView({ grid, cols, rows, starts, exits, fires, openS
        if (type === "blocked" || type === "window") color = "#64748b";
        if (type === "unknown") color = view === "overlay" ? "rgba(217,70,239,.24)" : "#f3e8ff";
        if (type === "obstacle") color = "#fde68a";
+       if (type === "crowd") color = "#fed7aa";
+       if (type === "smoke") color = view === "overlay" ? "rgba(100,116,139,.55)" : "#cbd5e1";
+       if (type === "stairs") color = "#bae6fd";
       if (fk.has(k) || type === "fire") color = "#f97316";
        ctx.fillStyle = color; ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
        if (type === "unknown") { ctx.save(); ctx.beginPath(); ctx.rect(x * cellSize, y * cellSize, cellSize, cellSize); ctx.clip(); ctx.strokeStyle = "rgba(147,51,234,.66)"; ctx.lineWidth = 1; for (let d = -cellSize; d <= cellSize * 2; d += 7) { ctx.beginPath(); ctx.moveTo(x * cellSize + d, y * cellSize); ctx.lineTo(x * cellSize + d - cellSize, (y + 1) * cellSize); ctx.stroke(); } ctx.restore(); }

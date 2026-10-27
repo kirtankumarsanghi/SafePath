@@ -12,9 +12,10 @@
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=black)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PGlite-336791?logo=postgresql&logoColor=white)
-![Unit tests](https://img.shields.io/badge/unit%20tests-13%2F13%20passing-brightgreen)
+![Unit tests](https://img.shields.io/badge/unit%20tests-17%2F17%20passing-brightgreen)
 ![Typecheck](https://img.shields.io/badge/typecheck-passing-brightgreen)
 ![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?logo=githubactions&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-emerald)
 
 [Quick start](#-quick-start) · [Screenshots](#-screenshots) · [Results](#-results) · [How it works](#-how-it-works) · [Docs](#-table-of-contents)
 
@@ -111,7 +112,7 @@ All numbers below were **measured on this repository** (not estimated). The test
 
 | Check | Result |
 | --- | --- |
-| Unit tests (`node:test` via `tsx`) | **13 / 13 passed**, 0 failed, 0 skipped |
+| Unit tests (`node:test` via `tsx`) | **17 / 17 passed**, 0 failed, 0 skipped |
 | TypeScript strict typecheck (`tsc --noEmit`) | **Passed**, 0 errors |
 | Every heuristic vs an independent Dijkstra baseline | **Same optimal cost** on weighted, multi-exit grids |
 | Blank image | **0 exits and 0 starts invented** |
@@ -517,7 +518,7 @@ Specs: `landing`, `design-system`, `account`, `upload`, `monochrome`, `refinemen
 
 ## 📄 License
 
-No license has been specified yet. Add a `LICENSE` file (for example MIT) and update this section.
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for full details.
 
 ---
 

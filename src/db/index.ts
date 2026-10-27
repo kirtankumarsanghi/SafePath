@@ -21,7 +21,12 @@ const globalForDb = globalThis as typeof globalThis & {
 };
 
 // Cloud providers (Neon, Supabase, AWS RDS, etc.) require SSL.
-const sslConfig = isLocalhost ? false : { rejectUnauthorized: false };
+// Support explicit CA verification via DATABASE_CA_CERT or DB_REJECT_UNAUTHORIZED=true.
+const sslConfig = isLocalhost
+  ? false
+  : process.env.DATABASE_CA_CERT
+  ? { rejectUnauthorized: true, ca: process.env.DATABASE_CA_CERT }
+  : { rejectUnauthorized: process.env.DB_REJECT_UNAUTHORIZED === "true" };
 
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
@@ -99,7 +104,6 @@ export async function ensureDatabaseReady(): Promise<void> {
           );
         `);
 
-        // Check whether initial sample floor plans are already populated
         const countRes = await pool.query(
           "SELECT COUNT(*)::int as count FROM floor_maps"
         );

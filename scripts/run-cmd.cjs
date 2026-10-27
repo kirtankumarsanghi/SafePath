@@ -11,8 +11,9 @@ function getValidNode() {
 
   const candidates = [
     path.join(process.env.LOCALAPPDATA || '', 'hermes', 'node', 'node.exe'),
-    'C:\\Users\\Kirtan Kumar Sanghi\\AppData\\Local\\hermes\\node\\node.exe',
-  ];
+    path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'hermes', 'node', 'node.exe'),
+    path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs', 'node.exe'),
+  ].filter(Boolean);
 
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
@@ -178,7 +179,6 @@ async function main() {
     cmd = targetNode;
     args = [playwrightBin, 'test', ...process.argv.slice(3)];
   } else {
-    // Pass arbitrary command through to npx or node
     cmd = targetNode;
     args = process.argv.slice(2);
   }

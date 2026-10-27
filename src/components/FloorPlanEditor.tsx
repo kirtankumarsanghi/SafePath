@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { UserRound, DoorOpen, Square, Flame, Eraser, Undo2, ZoomIn, ZoomOut, Scan, Ban, MousePointer2 } from "lucide-react";
+import { UserRound, DoorOpen, Square, Flame, Eraser, Undo2, ZoomIn, ZoomOut, Scan, Ban, MousePointer2, CloudFog, Layers } from "lucide-react";
 import GridView, { type DrawnPath, type GridMarker } from "./GridView";
 import { applyTool, type EditTool, type GridDocument } from "@/lib/map-model";
 import type { Bounds } from "@/lib/map-analysis";
@@ -11,6 +11,8 @@ const TOOLS = [
   { id: "wall", label: "Wall", Icon: Square, help: "Drag to draw solid walls. A* will never cross these cells." },
   { id: "floor", label: "Walkable / door", Icon: Scan, help: "Drag to open a verified door or corridor. Only clear walls where the source actually shows a passage." },
   { id: "fire", label: "Fire", Icon: Flame, help: "Draw a simulated fire zone. This does not mean fire was detected in the building." },
+  { id: "smoke", label: "Smoke (5×)", Icon: CloudFog, help: "Paint smoky or hazardous zones with high traversal cost (5×). Passable only when safer routes are unavailable." },
+  { id: "stairs", label: "Stairs (2×)", Icon: Layers, help: "Mark stairwells or vertical connectors (2× traversal cost)." },
   { id: "blocked", label: "Exclude area", Icon: Ban, help: "Block legends, exterior margins, locked doors or other non-navigable areas." },
   { id: "erase", label: "Erase", Icon: Eraser, help: "Clear the selected cell, including its person, exit, wall and fire markers." },
 ] as const;

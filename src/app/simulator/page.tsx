@@ -2,13 +2,17 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Play, Pause, StepBack, StepForward, SkipForward, RotateCcw, Save, Route, BrainCircuit, Loader2, CheckCircle2, AlertTriangle, SlidersHorizontal, Flame, MousePointer2, PencilRuler, ArrowLeft, ShieldCheck, UserRound, DoorOpen, Info } from "lucide-react";
+import { Play, Pause, StepBack, StepForward, SkipForward, RotateCcw, Save, Route, BrainCircuit, Loader2, CheckCircle2, AlertTriangle, SlidersHorizontal, Flame, MousePointer2, PencilRuler, ArrowLeft, ShieldCheck, UserRound, DoorOpen, Info, CloudFog, Layers } from "lucide-react";
 import DashboardLayout from "@/components/DashboardLayout";
 import GridView from "@/components/GridView";
+import SimulatorStatsPanel from "@/components/simulator/SimulatorStatsPanel";
+import PeopleAssignmentCard from "@/components/simulator/PeopleAssignmentCard";
+import HeuristicComparisonCard, { type HeuristicComparisonRow } from "@/components/simulator/HeuristicComparisonCard";
 import { colorForIndex, getSearchFrame, heuristicDescription, heuristicFormula, samePoint, type AStarRunResult, type HeuristicType, type Point } from "@/lib/astar";
 import { computeEvacuation } from "@/lib/compute-client";
 import { applyTool, cleanTerrain, inspectDocument, requestHeaders, type GridDocument, type SavedMap } from "@/lib/map-model";
 import { getCustomMaps, getCustomMapById, toMapSummary, ensureValidCoordinates } from "@/lib/custom-maps-storage";
+
 function demo(): GridDocument {
   const grid: GridDocument["gridData"] = {};
   for (let y = 0; y < 20; y++) for (let x = 0; x < 28; x++) grid[`${x},${y}`] = x === 0 || y === 0 || x === 27 || y === 19 || x === 11 && y > 2 && y < 15 && y !== 9 ? "wall" : "empty";
@@ -26,12 +30,14 @@ function Simulator() {
   const [doc, setDoc] = useState<GridDocument | null>(null), [map, setMap] = useState<SavedMap | null>(null), [maps, setMaps] = useState<{ id: number; title: string }[]>([]);
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [saving, setSaving] = useState(false), [saved, setSaved] = useState(false);
   const [heuristic, setHeuristic] = useState<HeuristicType>("manhattan"), [diagonal, setDiagonal] = useState(false), [live, setLive] = useState(true), [values, setValues] = useState(false);
+  const [congestionPenalty, setCongestionPenalty] = useState(0), [exitCapacity, setExitCapacity] = useState(0), [fireBufferPenalty, setFireBufferPenalty] = useState(0);
+  const [scaleMeters, setScaleMeters] = useState(1.0), [walkingSpeed, setWalkingSpeed] = useState(1.35);
   const [enabled, setEnabled] = useState(false), [nonce, setNonce] = useState(0), [computing, setComputing] = useState(false);
   const [results, setResults] = useState<AStarRunResult[] | null>(null), [active, setActive] = useState(0), [cursor, setCursor] = useState(0), [playing, setPlaying] = useState(false), [speed, setSpeed] = useState(12);
-  const [tool, setTool] = useState<"inspect" | "person" | "exit" | "fire" | "floor" | "wall">("inspect"), [view, setView] = useState<"grid" | "overlay" | "image">("grid"), [selected, setSelected] = useState<Point | null>(null);
-  const [comparison, setComparison] = useState<{ heuristic: HeuristicType; cost: number; nodes: number; time: number }[]>([]), [comparing, setComparing] = useState(false), [compareAll, setCompareAll] = useState(false);
+  const [tool, setTool] = useState<"inspect" | "person" | "exit" | "fire" | "smoke" | "stairs" | "floor" | "wall">("inspect"), [view, setView] = useState<"grid" | "overlay" | "image">("grid"), [selected, setSelected] = useState<Point | null>(null);
+  const [comparison, setComparison] = useState<HeuristicComparisonRow[]>([]), [comparing, setComparing] = useState(false), [compareAll, setCompareAll] = useState(false);
   const compareAbort = useRef<AbortController | null>(null);
-  
+
   useEffect(() => {
     const loadMaps = () => {
       fetch("/api/maps")
@@ -117,7 +123,6 @@ function Simulator() {
           setView(loaded.imageUrl ? "overlay" : "grid");
           setHeuristic("manhattan");
           setDiagonal(false);
-          // Automatically activate A* calculation so any floor plan is immediately playable
           setEnabled(true);
         })
         .catch(e => {
@@ -138,10 +143,36 @@ function Simulator() {
       if (!enabled || !doc || loading) { setComputing(false); return; }
       if (!doc.starts.length || !doc.exits.length) { setResults(null); setPlaying(false); setComputing(false); setError("Place at least one person and one confirmed exit before running A*."); return; }
       setComputing(true); setResults(null); setCursor(0); setPlaying(false); setError("");
-      computeEvacuation(doc, heuristic, { allowDiagonal: diagonal }, abort.signal).then(r => { if (!abort.signal.aborted) { setResults(r); setActive(0); setCursor(0); setPlaying((r[0]?.steps.length ?? 0) > 0); } }).catch(e => { if (!abort.signal.aborted) setError(e.message); }).finally(() => { if (!abort.signal.aborted) setComputing(false); });
+      computeEvacuation(
+        doc,
+        heuristic,
+        {
+          allowDiagonal: diagonal,
+          congestionPenalty,
+          exitCapacity: exitCapacity > 0 ? exitCapacity : undefined,
+          fireBufferPenalty,
+          includeSecondBestExit: true,
+        },
+        abort.signal
+      )
+        .then(r => {
+          if (!abort.signal.aborted) {
+            setResults(r);
+            setActive(0);
+            setCursor(0);
+            setPlaying((r[0]?.steps.length ?? 0) > 0);
+          }
+        })
+        .catch(e => {
+          if (!abort.signal.aborted) setError(e.message);
+        })
+        .finally(() => {
+          if (!abort.signal.aborted) setComputing(false);
+        });
     }, 100);
     return () => { clearTimeout(timer); abort.abort(); };
-  }, [doc, heuristic, diagonal, enabled, nonce, loading]);
+  }, [doc, heuristic, diagonal, congestionPenalty, exitCapacity, fireBufferPenalty, enabled, nonce, loading]);
+
   const run = results?.[active], total = run?.steps.length ?? 0;
   useEffect(() => {
     if (!playing || total === 0) return;
@@ -151,6 +182,25 @@ function Simulator() {
     }, cursor >= total ? 0 : 1000 / speed);
     return () => clearTimeout(timer);
   }, [playing, cursor, total, speed]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target || ["INPUT", "SELECT", "TEXTAREA", "BUTTON", "CANVAS"].includes(target.tagName) || target.isContentEditable) return;
+      if (e.key === "[" && cursor > 0) {
+        e.preventDefault();
+        setPlaying(false);
+        setCursor(c => Math.max(0, c - 1));
+      } else if (e.key === "]" && total > 0 && cursor < total) {
+        e.preventDefault();
+        setPlaying(false);
+        setCursor(c => Math.min(total, c + 1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cursor, total]);
+
   useEffect(() => () => compareAbort.current?.abort(), []);
   const frame = useMemo(() => getSearchFrame(run, cursor - 1), [run, cursor]);
   const current = cursor ? run?.steps[cursor - 1] : null, done = !!run && cursor >= total;
@@ -161,10 +211,11 @@ function Simulator() {
   const draft = !!map?.imageUrl && !map.analysis?.reviewed;
   const failures = (results ?? []).map((r, i) => ({ run: r, person: i + 1 })).filter(x => !x.run.reached);
   const precheck = useMemo(() => (doc ? inspectDocument(doc, { allowDiagonal: diagonal }) : null), [doc, diagonal]);
+
   function search() { setEnabled(true); setNonce(n => n + 1); }
   function resetDemo() {
     if (requestedId) { router.push("/simulator"); return; }
-    setDoc(demo()); setResults(null); setCursor(0); setPlaying(false); setError(""); setComparison([]); setActive(0); setSaved(false); setEnabled(false);
+    setDoc(demo()); setResults(null); setCursor(0); setPlaying(false); setError(""); setComparison([]); setActive(0); setSaved(false); setEnabled(false); setCongestionPenalty(0); setExitCapacity(0); setFireBufferPenalty(0);
   }
   function loadSmallDemo() {
     setDoc(demoSmall()); setResults(null); setCursor(0); setPlaying(false); setError(""); setComparison([]); setActive(0); setSaved(false); setEnabled(true);
@@ -180,7 +231,7 @@ function Simulator() {
     if (!doc || !results || saving) return;
     setSaving(true); setError("");
     try {
-      const response = await fetch("/api/runs", { method: "POST", headers: requestHeaders(), body: JSON.stringify({ mapId: map?.id ?? null, title: `${map?.title ?? "Practice grid"} — ${heuristic}`, document: doc, heuristic, config: { allowDiagonal: diagonal } }) });
+      const response = await fetch("/api/runs", { method: "POST", headers: requestHeaders(), body: JSON.stringify({ mapId: map?.id ?? null, title: `${map?.title ?? "Practice grid"} — ${heuristic}`, document: doc, heuristic, config: { allowDiagonal: diagonal, congestionPenalty, exitCapacity: exitCapacity > 0 ? exitCapacity : undefined, fireBufferPenalty } }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Could not save the run."); setSaved(true);
     } catch (e) {
       setSaved(false); setError(e instanceof Error ? e.message : "Could not save this run.");
@@ -192,9 +243,9 @@ function Simulator() {
     if (!starts.length) return;
     setComparing(true); compareAbort.current?.abort(); const abort = new AbortController(); compareAbort.current = abort;
     try {
-      const table = [];
+      const table: HeuristicComparisonRow[] = [];
       for (const h of ["manhattan", "euclidean", "chebyshev"] as HeuristicType[]) {
-        const runs = await computeEvacuation({ ...doc, starts }, h, { allowDiagonal: diagonal, trace: false }, abort.signal);
+        const runs = await computeEvacuation({ ...doc, starts }, h, { allowDiagonal: diagonal, congestionPenalty, exitCapacity: exitCapacity > 0 ? exitCapacity : undefined, fireBufferPenalty, trace: false }, abort.signal);
         const complete = runs.every(r => r.reached);
         table.push({
           heuristic: h,
@@ -206,11 +257,49 @@ function Simulator() {
       if (!abort.signal.aborted) setComparison(table);
     } catch (e) { if (!abort.signal.aborted) setError(e instanceof Error ? e.message : "Comparison failed."); } finally { if (!abort.signal.aborted) setComparing(false); }
   }
+  function exportJson() {
+    if (!doc || !results) return;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      mapTitle: map?.title ?? "Practice grid",
+      heuristic,
+      config: { allowDiagonal: diagonal, congestionPenalty, exitCapacity: exitCapacity || null, fireBufferPenalty, scaleMeters, walkingSpeed },
+      document: doc,
+      results: results.map((r, i) => ({
+        person: i + 1,
+        reached: r.reached,
+        status: r.status,
+        start: r.start,
+        exit: r.exit,
+        path: r.path,
+        stats: r.stats,
+        alternativeExit: r.alternativeExit ?? null,
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `safepath-run-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  function exportPng() {
+    const canvas = document.querySelector<HTMLCanvasElement>('[data-testid="grid-canvas"]');
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `safepath-route-${Date.now()}.png`;
+    a.click();
+  }
+
   let narration = "Place a person and confirmed exits, then run A*. Routes are constrained to the reviewed grid; they are not a prediction of real evacuation safety.";
   if (computing) narration = "A* is evaluating the grid in a background worker. The interface stays responsive while the search runs.";
   else if (run && cursor === 0) narration = "Start initialized: g = 0. The heuristic is the minimum lower-bound distance to all unblocked exits. The frontier contains the starting cell.";
   else if (done) narration = run?.reached ? `Exit reached at (${run.exit.x}, ${run.exit.y}). Parent pointers reconstruct an optimal path for this grid with cost ${run.stats.totalCost.toFixed(2)}.` : run?.reason ?? "No route found.";
   else if (current) narration = `Expanded (${current.popped.x}, ${current.popped.y}): f = ${current.poppedF.toFixed(2)} = g ${current.poppedG.toFixed(2)} + h ${current.poppedH.toFixed(2)}. ${current.updates.length} neighbor scores updated. It was popped because it had the lowest f in OPEN; ties break on lower h, then insertion order. Amber cells are the frontier; purple cells have been explored.`;
+
   return <DashboardLayout><div className="planner">
     <div className="plan-breadcrumb"><Link href={map ? `/maps/${map.id}` : "/maps"}><ArrowLeft size={13} className="inline mr-1" />{map ? "Back to this map" : "My saved maps"}</Link><span>/</span><span>A* simulator</span></div>
     <header className="plan-page-heading"><div><div className="plan-eyebrow">SEARCH, STEP BY STEP</div><h1>A* route simulator</h1><p data-testid="loaded-map-title">{loading ? "Loading your saved map…" : map?.title ?? "Practice grid · choose a saved floor plan to use your building"}</p></div>{map && <Link className="plan-btn secondary" href={`/maps/${map.id}`}><PencilRuler size={15} />Refine this map</Link>}</header>
@@ -220,12 +309,38 @@ function Simulator() {
     {draft && <div className="plan-alert"><Info size={18} /><div>Running simulation on your custom floor plan. You can simulate, adjust doors or fire, and test escape routes freely. <Link href={`/maps/${map?.id}`} className="underline">Refine this map in the editor</Link> to adjust permanent walls.</div></div>}
     <section className="plan-card plan-pad" style={{ marginBottom: 20 }}><div className="plan-sim-header"><select aria-label="Select saved map" value={requestedId ?? ""} onChange={e => router.push(e.target.value ? `/simulator?mapId=${e.target.value}` : "/simulator")}><option value="">Practice grid</option>{maps.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}</select><div className="plan-form-row"><label>Heuristic <select aria-label="Heuristic" value={heuristic} onChange={e => setHeuristic(e.target.value as HeuristicType)}><option value="manhattan">Manhattan</option><option value="euclidean">Euclidean</option><option value="chebyshev">Chebyshev</option></select></label><button className="plan-btn primary" disabled={computing || loading || !doc} onClick={search}>{computing ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}{computing ? "Searching…" : results ? "Re-run A*" : "Run A*"}</button><button className="plan-btn secondary" disabled={loading || !doc} onClick={resetDemo} title="Restore the starting demo grid"><RotateCcw size={16} />Reset grid</button>{!requestedId && <button className="plan-btn secondary" disabled={loading} onClick={loadSmallDemo} title="Load a short 9 x 6 demo scenario"><Route size={16} />Small demo</button>}</div></div></section>
     {loading ? <div className="h-96 rounded-xl bg-slate-200 animate-pulse" /> : doc && <div className="plan-workspace"><div className="plan-main-column">
-      <section className="plan-card"><div className="editor-toolbar"><div className="plan-segmented">{(["grid", "overlay", "image"] as const).map(v => <button key={v} disabled={!map?.imageUrl && v !== "grid"} className={view === v ? "active" : ""} onClick={() => setView(v)}>{v === "grid" ? "Grid" : v === "overlay" ? "Image + grid" : "Source"}</button>)}</div><span className="plan-mono">{doc.gridWidth} × {doc.gridHeight} cells</span></div><div className="editor-tools">{([{ id: "inspect", label: "Inspect node", Icon: MousePointer2 }, { id: "person", label: "Place person", Icon: UserRound }, { id: "exit", label: "Place exit", Icon: DoorOpen }, { id: "fire", label: "Toggle fire", Icon: Flame }, { id: "floor", label: "Open door", Icon: PencilRuler }, { id: "wall", label: "Wall", Icon: SlidersHorizontal }] as const).map(t => <button key={t.id} className={tool === t.id ? "selected" : ""} onClick={() => setTool(t.id)}><t.Icon size={14} />{t.label}</button>)}</div><div className="editor-canvas-wrap"><GridView grid={doc.gridData} cols={doc.gridWidth} rows={doc.gridHeight} starts={doc.starts} exits={doc.exits} fires={doc.obstacles} openSet={frame.open} closedSet={frame.closed} fMap={frame.fMap} frameVersion={frame.version} paths={paths} showFValues={values} activeCell={current?.popped ?? null} imageUrl={map?.imageUrl} crop={map?.analysis?.options.crop} view={view} onCellClick={edit} onInspect={setSelected} cellSize={30} /></div><div className="editor-footer"><div className="plan-legend"><span><i style={{ background: "#263449" }} />Wall</span><span><i style={{ background: "#64748b" }} />Window / blocked</span><span><i style={{ background: "#f3e8ff" }} />Unknown (review)</span><span><i style={{ background: "#fde68a" }} />Slow terrain</span><span><i style={{ background: "#fbbf24" }} />Frontier ({frame.open.size})</span><span><i style={{ background: "#a78bfa" }} />Explored ({frame.closed.size})</span><span><i style={{ background: "#f97316" }} />Fire</span><span><i style={{ background: "#059669" }} />Final path</span></div><span className="plan-mono">{selected ? `(${selected.x}, ${selected.y})${chosenValues ? ` f=${chosenValues.f.toFixed(1)}` : ""}` : "Hover to inspect"}</span></div></section>
+      <section className="plan-card"><div className="editor-toolbar"><div className="plan-segmented">{(["grid", "overlay", "image"] as const).map(v => <button key={v} disabled={!map?.imageUrl && v !== "grid"} className={view === v ? "active" : ""} onClick={() => setView(v)}>{v === "grid" ? "Grid" : v === "overlay" ? "Image + grid" : "Source"}</button>)}</div><span className="plan-mono">{doc.gridWidth} × {doc.gridHeight} cells</span></div><div className="editor-tools">{([{ id: "inspect", label: "Inspect node", Icon: MousePointer2 }, { id: "person", label: "Place person", Icon: UserRound }, { id: "exit", label: "Place exit", Icon: DoorOpen }, { id: "fire", label: "Toggle fire", Icon: Flame }, { id: "smoke", label: "Smoke zone", Icon: CloudFog }, { id: "stairs", label: "Stairs", Icon: Layers }, { id: "floor", label: "Open door", Icon: PencilRuler }, { id: "wall", label: "Wall", Icon: SlidersHorizontal }] as const).map(t => <button key={t.id} className={tool === t.id ? "selected" : ""} onClick={() => setTool(t.id)}><t.Icon size={14} />{t.label}</button>)}</div><div className="editor-canvas-wrap"><GridView grid={doc.gridData} cols={doc.gridWidth} rows={doc.gridHeight} starts={doc.starts} exits={doc.exits} fires={doc.obstacles} openSet={frame.open} closedSet={frame.closed} fMap={frame.fMap} frameVersion={frame.version} paths={paths} showFValues={values} activeCell={current?.popped ?? null} imageUrl={map?.imageUrl} crop={map?.analysis?.options.crop} view={view} onCellClick={edit} onInspect={setSelected} cellSize={30} /></div><div className="editor-footer"><div className="plan-legend"><span><i style={{ background: "#263449" }} />Wall</span><span><i style={{ background: "#64748b" }} />Window / blocked</span><span><i style={{ background: "#f3e8ff" }} />Unknown (review)</span><span><i style={{ background: "#fde68a" }} />Slow terrain</span><span><i style={{ background: "#cbd5e1" }} />Smoke (5×)</span><span><i style={{ background: "#bae6fd" }} />Stairs (2×)</span><span><i style={{ background: "#fbbf24" }} />Frontier ({frame.open.size})</span><span><i style={{ background: "#a78bfa" }} />Explored ({frame.closed.size})</span><span><i style={{ background: "#f97316" }} />Fire</span><span><i style={{ background: "#059669" }} />Final path</span></div><span className="plan-mono">{selected ? `(${selected.x}, ${selected.y})${chosenValues ? ` f=${chosenValues.f.toFixed(1)}` : ""}` : "Hover to inspect"}</span></div></section>
       <section className="plan-card plan-pad"><div className="plan-sim-controls"><button aria-label="Reset playback" title="Reset playback" disabled={!results} onClick={() => { setCursor(0); setPlaying(false); }}><RotateCcw size={16} /></button><button aria-label="Step back" title="Step back" disabled={!cursor} onClick={() => { setPlaying(false); setCursor(c => Math.max(0, c - 1)); }}><StepBack size={17} /></button><button className="play" disabled={!total} onClick={() => { if (cursor >= total) setCursor(0); setPlaying(p => !p); }}>{playing ? <Pause size={16} /> : <Play size={16} />}<span style={{ marginLeft: 6 }}>{playing ? "Pause" : "Play"}</span></button><button aria-label="Step forward" title="Step forward" disabled={!total || done} onClick={() => { setPlaying(false); setCursor(c => Math.min(total, c + 1)); }}><StepForward size={17} /></button><button aria-label="Show final route" title="Show final route" disabled={!total} onClick={() => { setCursor(total); setPlaying(false); }}><SkipForward size={17} /></button><label className="plan-small" style={{ margin: "0 0 0 auto" }}>Speed <input aria-label="Playback speed" type="range" min={1} max={60} value={speed} onChange={e => setSpeed(Number(e.target.value))} className="accent-orange-500 w-20 align-middle" /> {speed}/s</label><label className="plan-checkbox" style={{ margin: 0 }}><input type="checkbox" checked={values} onChange={e => setValues(e.target.checked)} /><span>Show f(n)</span></label></div><div className="plan-sim-progress"><input type="range" aria-label="Search step" min={0} max={total || 1} value={cursor} disabled={!total} onChange={e => { setCursor(Number(e.target.value)); setPlaying(false); }} /><span>{cursor} / {total} expanded</span></div></section>
       <section className="plan-card plan-pad"><div className="plan-section-heading"><h3><BrainCircuit size={18} />What A* is doing</h3><span className="plan-pill neutral">{done ? run?.reached ? "Goal reached" : "No route" : computing ? "Computing" : playing ? "Exploring" : "Paused"}</span></div><p aria-live="polite" style={{ fontSize: 12, color: "var(--p-muted)", lineHeight: 1.8 }}>{narration}</p></section>
-      {failures.length > 0 && <div className="plan-alert" data-testid="no-route-alert"><AlertTriangle size={18} /><div>{failures.map(f => <p key={f.person}>Person {f.person}: {f.run.status === "invalid" || f.run.status === "limit" ? f.run.reason : "No exit is reachable through the reviewed grid. A* will not remove walls or cross fire to manufacture a route."}</p>)}</div></div>}
-      <section className="plan-card plan-pad"><div className="plan-section-heading"><h3>Compare heuristics fairly — {compareAll ? `all ${doc.starts.length} people` : `Person ${active + 1}`}</h3><label className="plan-checkbox" style={{ margin: 0 }}><input type="checkbox" checked={compareAll} onChange={e => { setCompareAll(e.target.checked); setComparison([]); }} /><span>All people</span></label><button className="plan-btn secondary small" disabled={comparing || !results} onClick={compare}>{comparing ? <Loader2 size={14} className="animate-spin" /> : <SlidersHorizontal size={14} />}Compare</button></div><p className="plan-small">Same selected people, grid, exits and movement costs. Only the heuristic changes. Runtime is measured separately from animation.</p>{comparison.length > 0 && <table className="plan-comparison"><thead><tr><th>Heuristic</th><th>Cost</th><th>Explored</th><th>Time</th></tr></thead><tbody>{comparison.map(r => <tr key={r.heuristic}><td className="capitalize">{r.heuristic}</td><td>{Number.isFinite(r.cost) ? r.cost.toFixed(2) : "No route"}</td><td>{r.nodes}</td><td>{r.time.toFixed(2)} ms</td></tr>)}</tbody></table>}<p className="plan-small">When every selected person is reachable, all three return the same optimal cost; only the explored node count changes. That is what admissibility guarantees.</p></section>
-    </div><aside className="plan-side-column"><section className="plan-card plan-pad"><div className="plan-section-heading"><h3>Live search statistics</h3></div><div className="plan-sim-stats">{[{ label: "Path cost", value: done && run?.reached ? run.stats.totalCost.toFixed(2) : "—" }, { label: "Nodes explored", value: run ? run.stats.nodesExplored : "—" }, { label: "Steps played", value: `${cursor} / ${total}` }, { label: "Open list", value: frame.open.size }, { label: "Closed list", value: frame.closed.size }, { label: "Compute time", value: run ? `${run.stats.timeTakenMs.toFixed(2)} ms` : "—" }, { label: "Routes found", value: results ? `${results.filter(r => r.reached).length} / ${doc.starts.length}` : "—" }].map(s => <div key={s.label}><span>{s.label}</span><strong>{s.value}</strong></div>)}</div><p className="plan-small">Costs are grid units, not meters or evacuation time. People are routed independently; crowd congestion is not modeled.</p></section>
+      {failures.length > 0 && <div className="plan-alert" data-testid="no-route-alert"><AlertTriangle size={18} /><div>{failures.map(f => <p key={f.person}>Person {f.person}: {f.run.status === "invalid" || f.run.status === "limit" || f.run.reason?.includes("capacity") ? f.run.reason : "No exit is reachable through the reviewed grid. A* will not remove walls or cross fire to manufacture a route."}</p>)}</div></div>}
+      <HeuristicComparisonCard
+        startsCount={doc.starts.length}
+        activePerson={active}
+        compareAll={compareAll}
+        onCompareAllChange={v => { setCompareAll(v); setComparison([]); }}
+        comparing={comparing}
+        hasResults={Boolean(results)}
+        onCompare={compare}
+        comparison={comparison}
+      />
+    </div><aside className="plan-side-column">
+      <SimulatorStatsPanel
+        run={run}
+        results={results}
+        done={done}
+        cursor={cursor}
+        total={total}
+        openSize={frame.open.size}
+        closedSize={frame.closed.size}
+        startsCount={doc.starts.length}
+        gridData={doc.gridData}
+        scaleMeters={scaleMeters}
+        onScaleMetersChange={setScaleMeters}
+        walkingSpeed={walkingSpeed}
+        onWalkingSpeedChange={setWalkingSpeed}
+        onExportJson={exportJson}
+        onExportPng={exportPng}
+      />
       <section className="plan-card plan-pad" data-testid="current-node">
         <div className="plan-section-heading"><h3>Current node</h3><span className="plan-pill neutral">{shownHeuristic}</span></div>
         {node ? <div className="plan-sim-stats">
@@ -237,7 +352,17 @@ function Simulator() {
         <div className="plan-theory-code">{heuristicFormula(shownHeuristic)}{diagonal && shownHeuristic === "manhattan" && <><br />h is scaled by 1 / √2</>}</div>
         <p className="plan-small">A* pops the node with the smallest f. Ties use lower h, then insertion order.</p>
       </section>
-      {results && <section className="plan-card plan-pad"><div className="plan-section-heading"><h3>People & exit assignments</h3></div><div className="plan-people-buttons">{results.map((r, i) => <button key={i} className={i === active ? "active" : ""} onClick={() => { setActive(i); setCursor(0); setPlaying(false); setComparison([]); }}>Person {i + 1} <span>{r.reached ? `Exit (${r.exit.x}, ${r.exit.y}) · cost ${r.stats.totalCost.toFixed(2)}` : r.status === "invalid" ? "Invalid start or exit" : "No reachable exit"}</span></button>)}</div></section>}
+      <PeopleAssignmentCard
+        results={results}
+        active={active}
+        onSelectPerson={i => { setActive(i); setCursor(0); setPlaying(false); setComparison([]); }}
+        congestionPenalty={congestionPenalty}
+        onCongestionPenaltyChange={setCongestionPenalty}
+        exitCapacity={exitCapacity}
+        onExitCapacityChange={setExitCapacity}
+        fireBufferPenalty={fireBufferPenalty}
+        onFireBufferPenaltyChange={setFireBufferPenalty}
+      />
       <section className="plan-card plan-pad"><h3>Search model</h3><label className="plan-checkbox"><input type="checkbox" checked={diagonal} onChange={e => setDiagonal(e.target.checked)} /><span>Allow diagonals (cost √2; no corner cutting)</span></label><label className="plan-checkbox"><input type="checkbox" checked={live} onChange={e => setLive(e.target.checked)} /><span>Re-plan after fire or grid edits</span></label><div className="plan-theory-code">f(n) = g(n) + h(n)<br />{heuristicFormula(heuristic)}{diagonal && heuristic === "manhattan" && <><br />h is scaled by 1 / √2</>}</div><p className="plan-small">{heuristicDescription(heuristic)} For multiple exits, use the minimum estimate to any exit.</p><button className="plan-btn primary full" onClick={saveRun} disabled={!results || saving || saved}>{saving ? <Loader2 size={16} className="animate-spin" /> : saved ? <CheckCircle2 size={16} /> : <Save size={16} />}{saved ? "Run saved to history" : saving ? "Saving result…" : "Save this run"}</button><Link className="plan-text-btn mt-3" href="/runs">View run history</Link></section>
       <section className="plan-card plan-pad"><h3>Why A* finds the optimal route</h3><p className="plan-small">g(n) is the actual cost from the person. h(n) is a lower bound to the nearest goal. A* expands the smallest f(n), then reconstructs the parent chain when it reaches an exit.</p><p className="plan-small">Walls, fire, unknown cells and windows have infinite cost. With these non-negative movement costs and an admissible heuristic, the returned route is optimal for this grid—not necessarily for the real building.</p><Link className="plan-text-btn" href="/theory">Explore the algorithm theory</Link></section>
     </aside></div>}
